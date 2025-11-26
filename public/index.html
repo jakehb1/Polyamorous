@@ -2,20 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Polysight – Polymarket Mini App</title>
+  <title>Polyamorous – Polymarket Mini App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
     :root {
-      --bg: #020617;
-      --card-bg: #020617;
-      --card-outline: #1e293b;
-      --text-primary: #e5e7eb;
-      --text-secondary: #9ca3af;
-      --button-bg: #111827;
-      --button-border: #1f2937;
-      --button-text: #e5e7eb;
-      --pill-bg: #020617;
+      --bg: #f4f4f5;
+      --card-bg: #ffffff;
+      --card-outline: #e4e4e7;
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --button-bg: #f3f4f6;
+      --button-border: #e5e7eb;
+      --button-text: #111827;
+      --pill-bg: #f9fafb;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
     }
 
     * { box-sizing: border-box; }
@@ -25,7 +27,7 @@
       padding: 16px;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
         "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #020617 0, #020617 50%, #000 100%);
+      background: radial-gradient(circle at top, #e5e7eb 0, #f4f4f5 50%, #e5e7eb 100%);
       color: var(--text-primary);
     }
 
@@ -39,7 +41,7 @@
       border-radius: 18px;
       padding: 16px 16px 12px;
       border: 1px solid var(--card-outline);
-      box-shadow: 0 18px 35px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 8px 25px rgba(15, 23, 42, 0.05);
       margin-bottom: 12px;
     }
 
@@ -49,6 +51,8 @@
       margin-bottom: 6px;
       font-size: 15px;
       letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #111827;
     }
 
     .card-header span {
@@ -67,6 +71,8 @@
       font-weight: 700;
       letter-spacing: 0.06em;
       margin: 10px 0 6px;
+      text-transform: uppercase;
+      color: #4b5563;
     }
 
     .wallet-line {
@@ -80,6 +86,7 @@
       gap: 6px;
       font-weight: 600;
       margin-bottom: 2px;
+      color: #111827;
     }
 
     .wallet-emoji { font-size: 16px; }
@@ -94,7 +101,7 @@
       padding: 6px 10px;
       background: var(--pill-bg);
       border-radius: 999px;
-      border: 1px solid #1e293b;
+      border: 1px solid #e5e7eb;
       color: var(--text-secondary);
       cursor: pointer;
       user-select: all;
@@ -124,6 +131,7 @@
     .balance-value {
       font-variant-numeric: tabular-nums;
       color: var(--text-primary);
+      font-weight: 600;
     }
 
     .timestamp {
@@ -161,7 +169,7 @@
     .btn span.icon { font-size: 18px; }
 
     .btn-primary {
-      background: linear-gradient(135deg, #eab308, #f97316);
+      background: linear-gradient(135deg, #facc15, #fb923c);
       color: #111827;
       border-color: transparent;
       box-shadow: 0 10px 25px rgba(251, 191, 36, 0.35);
@@ -218,6 +226,7 @@
       margin-bottom: 2px;
       text-decoration: underline;
       cursor: pointer;
+      color: var(--accent);
     }
 
     .market-line {
@@ -242,9 +251,9 @@
       max-width: 420px;
       margin: 0 auto;
       padding: 12px 16px 16px;
-      background: rgba(15, 23, 42, 0.98);
-      border-top: 1px solid #1f2933;
-      box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.7);
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
+      box-shadow: 0 -14px 30px rgba(15, 23, 42, 0.18);
       border-radius: 18px 18px 0 0;
       z-index: 20;
       display: none;
@@ -258,6 +267,7 @@
       font-size: 14px;
       font-weight: 600;
       margin-bottom: 4px;
+      color: #111827;
     }
 
     .buy-subtitle {
@@ -309,7 +319,7 @@
     <!-- WELCOME + WALLETS CARD -->
     <div class="card">
       <div class="card-header">
-        WELCOME TO POLYSIGHT 🔮
+        WELCOME TO POLYAMOROUS 🔮
       </div>
       <div class="card-subtitle">
         Predict the future on Telegram. Powered by Polymarket.
@@ -403,7 +413,7 @@
     <div class="card" id="marketsCard">
       <div class="card-header">📊 Markets</div>
       <div class="pill-label">
-        Finding a market on Polysight is easy.
+        Finding a market on Polyamorous is easy.
       </div>
       <ul style="margin: 6px 0 0 18px; padding: 0; font-size: 13px; color: var(--text-secondary);">
         <li>🔥 Trending – Hot markets by 24h volume</li>
@@ -478,7 +488,7 @@
 
     // -------- Wallets & balances --------
     function loadOrCreateWallets() {
-      const existing = window.localStorage.getItem("polysightWallets");
+      const existing = window.localStorage.getItem("polyamorousWallets");
       if (existing) {
         try { return JSON.parse(existing); } catch (e) {}
       }
@@ -497,7 +507,7 @@
         }
       };
 
-      window.localStorage.setItem("polysightWallets", JSON.stringify(wallets));
+      window.localStorage.setItem("polyamorousWallets", JSON.stringify(wallets));
       return wallets;
     }
 
@@ -677,8 +687,8 @@
       const [yesTokenId, noTokenId] = tokenIds;
       const tokenId = outcomeSide === "YES" ? yesTokenId : noTokenId;
 
-      const size = 10;   // demo: 10 shares
-      const price = 0.5; // demo: $0.50
+      const size = 10;   // demo
+      const price = 0.5; // demo
 
       try {
         const res = await fetch("/api/trade", {
