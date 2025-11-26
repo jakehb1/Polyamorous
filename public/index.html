@@ -1,17 +1,892 @@
 <!DOCTYPE html>
-<html lang=\"en\">
+<html lang="en">
 <head>
-  <meta charset=\"UTF-8\" />
+  <meta charset="UTF-8" />
   <title>Polysight – Polymarket Mini App</title>
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <!-- Styles omitted here for brevity in this environment; you have them from the prior answer. -->
-  <!-- For the zip, please refer to the assistant's message content, which contains full index.html including CSS and JS. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root {
+      --bg: #020617;
+      --card-bg: #020617;
+      --card-outline: #1e293b;
+      --text-primary: #e5e7eb;
+      --text-secondary: #9ca3af;
+      --button-bg: #111827;
+      --button-border: #1f2937;
+      --button-text: #e5e7eb;
+      --pill-bg: #020617;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #020617 0, #020617 50%, #000 100%);
+      color: var(--text-primary);
+    }
+
+    .app {
+      max-width: 420px;
+      margin: 0 auto 40px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 16px 16px 12px;
+      border: 1px solid var(--card-outline);
+      box-shadow: 0 18px 35px rgba(0, 0, 0, 0.45);
+      margin-bottom: 12px;
+    }
+
+    .card-header {
+      text-align: left;
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 15px;
+      letter-spacing: 0.06em;
+    }
+
+    .card-header span {
+      font-size: 18px;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin: 10px 0 6px;
+    }
+
+    .wallet-line {
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .wallet-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .wallet-emoji { font-size: 16px; }
+
+    .wallet-address {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      padding: 6px 10px;
+      background: var(--pill-bg);
+      border-radius: 999px;
+      border: 1px solid #1e293b;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: all;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .balances { margin-top: 4px; }
+
+    .balance-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .balance-dot { font-size: 14px; }
+
+    .balance-label {
+      flex: 1;
+      color: var(--text-secondary);
+    }
+
+    .balance-value {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .timestamp {
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    .button-grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--button-border);
+      background: var(--button-bg);
+      color: var(--button-text);
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn span.icon { font-size: 18px; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #eab308, #f97316);
+      color: #111827;
+      border-color: transparent;
+      box-shadow: 0 10px 25px rgba(251, 191, 36, 0.35);
+    }
+
+    .btn-deposit { grid-column: span 2; }
+
+    .btn-small {
+      padding: 8px 10px;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: 0.02em;
+    }
+
+    .markets-filters {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .markets-filters .btn {
+      font-size: 12px;
+      padding: 8px 6px;
+    }
+
+    .markets-filters .btn-wide {
+      grid-column: span 2;
+    }
+
+    .pill-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .markets-list {
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .market-item {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    .market-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .market-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .market-line {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .market-label {
+      color: var(--text-secondary);
+    }
+
+    .market-value {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .buy-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 12px 16px 16px;
+      background: rgba(15, 23, 42, 0.98);
+      border-top: 1px solid #1f2933;
+      box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.7);
+      border-radius: 18px 18px 0 0;
+      z-index: 20;
+      display: none;
+    }
+
+    .buy-sheet.visible {
+      display: block;
+    }
+
+    .buy-header {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .buy-subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .buy-price-row {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .buy-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .portfolio-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .portfolio-buttons .btn-wide {
+      grid-column: span 2;
+    }
+
+    .portfolio-body {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 360px) {
+      body { padding: 10px; }
+      .btn { font-size: 13px; padding-block: 10px; }
+      .wallet-address { font-size: 11px; }
+    }
+  </style>
 </head>
 <body>
-  <!-- Placeholder: copy the full index.html from the assistant response into this file after downloading the zip if needed. -->
-  <div style='padding:16px;font-family:system-ui,sans-serif;color:#e5e7eb;background:#020617;'>
-    <h2>Polysight Mini App</h2>
-    <p>This placeholder index.html was included to keep the zip small. Replace it with the full HTML from the ChatGPT message.</p>
+  <div class="app">
+    <!-- WELCOME + WALLETS CARD -->
+    <div class="card">
+      <div class="card-header">
+        WELCOME TO POLYSIGHT 🔮
+      </div>
+      <div class="card-subtitle">
+        Predict the future on Telegram. Powered by Polymarket.
+      </div>
+
+      <div class="section-title">
+        💰 Deposit to begin trading 💰
+      </div>
+
+      <div class="section-title">YOUR WALLETS</div>
+
+      <div class="wallet-line">
+        <div class="wallet-label">
+          <span class="wallet-emoji">💎</span> Polygon:
+        </div>
+        <div id="polygonAddress" class="wallet-address" title="Tap to copy">
+          generating…
+        </div>
+      </div>
+
+      <div class="wallet-line" style="margin-top: 6px;">
+        <div class="wallet-label">
+          <span class="wallet-emoji">💲</span> Solana:
+        </div>
+        <div id="solanaAddress" class="wallet-address" title="Tap to copy">
+          generating…
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 12px;">BALANCES</div>
+      <div class="balances">
+        <div class="balance-row">
+          <span class="balance-dot">🔷</span>
+          <span class="balance-label">POL USDC.e Available for Trades</span>
+          <span class="balance-value" id="availableBalance">0.00</span>
+        </div>
+        <div class="balance-row">
+          <span class="balance-dot">🔷</span>
+          <span class="balance-label">Open Positions Value</span>
+          <span class="balance-value" id="openPositions">0.00</span>
+        </div>
+        <div class="balance-row">
+          <span class="balance-dot">🔷</span>
+          <span class="balance-label">Pending Limit Orders</span>
+          <span class="balance-value" id="pendingOrders">0.00</span>
+        </div>
+      </div>
+
+      <div class="timestamp" id="timestamp"></div>
+
+      <!-- Main navigation buttons -->
+      <div class="button-grid">
+        <button class="btn btn-primary btn-deposit" id="depositBtn">
+          <span class="icon">💰</span>
+          <span>Deposit</span>
+        </button>
+
+        <button class="btn" id="marketsBtn">
+          <span class="icon">📊</span>
+          <span>Markets</span>
+        </button>
+
+        <button class="btn" id="guideBtn">
+          <span class="icon">💡</span>
+          <span>Guide</span>
+        </button>
+
+        <button class="btn" id="portfolioBtn">
+          <span class="icon">💼</span>
+          <span>Portfolio</span>
+        </button>
+
+        <button class="btn" id="walletsBtn">
+          <span class="icon">👛</span>
+          <span>Wallets</span>
+        </button>
+
+        <button class="btn" id="updatesBtn">
+          <span class="icon">📣</span>
+          <span>Updates</span>
+        </button>
+
+        <button class="btn" id="inviteBtn">
+          <span class="icon">🤝</span>
+          <span>Invite</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- MARKETS CARD -->
+    <div class="card" id="marketsCard">
+      <div class="card-header">📊 Markets</div>
+      <div class="pill-label">
+        Finding a market on Polysight is easy.
+      </div>
+      <ul style="margin: 6px 0 0 18px; padding: 0; font-size: 13px; color: var(--text-secondary);">
+        <li>🔥 Trending – Hot markets by 24h volume</li>
+        <li>📈 Volume – Markets by total volume</li>
+        <li>🆕 New – Recently created markets</li>
+        <li>📂 Category – Browse by category</li>
+        <li>🔍 Search – Search by keywords (e.g. “bitcoin” or “election”)</li>
+      </ul>
+
+      <div class="markets-filters">
+        <button class="btn btn-small" data-markets-filter="trending">🔥 TRENDING</button>
+        <button class="btn btn-small" data-markets-filter="volume">📈 VOLUME</button>
+        <button class="btn btn-small" data-markets-filter="new">🆕 NEW</button>
+        <button class="btn btn-small" data-markets-filter="category">📂 CATEGORY</button>
+        <button class="btn btn-small btn-wide" data-markets-filter="search">🔍 SEARCH</button>
+      </div>
+
+      <div class="section-title" style="margin-top: 12px;">
+        🆕 New Markets
+      </div>
+      <div class="markets-list" id="marketsList">
+        Loading markets…
+      </div>
+    </div>
+
+    <!-- PORTFOLIO CARD -->
+    <div class="card">
+      <div class="card-header">💼 PORTFOLIO</div>
+      <div class="pill-label">
+        Access your live positions, limit orders, and past trade history.
+      </div>
+      <div class="pill-label" style="margin-top: 4px;">
+        Generate PnL cards from your live positions or when you close a position.
+      </div>
+
+      <div class="portfolio-buttons">
+        <button class="btn btn-small" id="positionsBtn">💼 POSITIONS</button>
+        <button class="btn btn-small" id="ordersBtn">📋 ORDERS</button>
+        <button class="btn btn-small btn-wide" id="historyBtn">🧵 HISTORY</button>
+      </div>
+
+      <div class="portfolio-body" id="portfolioBody">
+        Tap a tab above to load your data.
+      </div>
+    </div>
   </div>
+
+  <!-- BUY YES / BUY NO bottom sheet -->
+  <div class="buy-sheet" id="buySheet">
+    <div class="buy-header" id="buyTitle">Market title</div>
+    <div class="buy-subtitle" id="buySubtitle">Pick YES or NO to place an order.</div>
+    <div class="buy-price-row" id="buyPriceRow"></div>
+    <div class="buy-buttons">
+      <button class="btn btn-primary" id="buyYesBtn">🟢 BUY YES</button>
+      <button class="btn" id="buyNoBtn">🔴 BUY NO</button>
+    </div>
+  </div>
+
+  <!-- Telegram API & crypto libs -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+
+  <script>
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    if (tg) tg.ready();
+
+    const appState = {
+      polygonAddress: null,
+      currentMarket: null,
+    };
+
+    // -------- Wallets & balances --------
+    function loadOrCreateWallets() {
+      const existing = window.localStorage.getItem("polysightWallets");
+      if (existing) {
+        try { return JSON.parse(existing); } catch (e) {}
+      }
+
+      const polygonWallet = ethers.Wallet.createRandom();
+      const solanaKeypair = solanaWeb3.Keypair.generate();
+
+      const wallets = {
+        polygon: {
+          address: polygonWallet.address,
+          privateKey: polygonWallet.privateKey
+        },
+        solana: {
+          publicKey: solanaKeypair.publicKey.toBase58(),
+          secretKey: Array.from(solanaKeypair.secretKey)
+        }
+      };
+
+      window.localStorage.setItem("polysightWallets", JSON.stringify(wallets));
+      return wallets;
+    }
+
+    function truncateAddress(addr, start = 6, end = 4) {
+      if (!addr || addr.length <= start + end) return addr;
+      return addr.slice(0, start) + "…" + addr.slice(-end);
+    }
+
+    function copyToClipboard(text) {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    async function refreshServerBalances(polygonAddress) {
+      try {
+        const res = await fetch(`/api/balances?address=${encodeURIComponent(polygonAddress)}`);
+        if (!res.ok) throw new Error("http " + res.status);
+        const data = await res.json();
+        const fmt = (n) => Number(n || 0).toFixed(2);
+
+        document.getElementById("availableBalance").textContent =
+          fmt(data.usdcAvailable);
+        document.getElementById("openPositions").textContent =
+          fmt(data.openPositionsValue);
+        document.getElementById("pendingOrders").textContent =
+          fmt(data.pendingOrdersValue);
+      } catch (err) {
+        console.error("refreshServerBalances error", err);
+      }
+    }
+
+    async function fetchDepositAddresses(polygonAddress) {
+      try {
+        const res = await fetch(`/api/deposit?address=${encodeURIComponent(polygonAddress)}`, {
+          method: "POST"
+        });
+        if (!res.ok) throw new Error("http " + res.status);
+        return await res.json();
+      } catch (err) {
+        console.error("fetchDepositAddresses error", err);
+        tg?.showAlert("Could not get deposit addresses. Try again.");
+        return null;
+      }
+    }
+
+    // -------- Markets --------
+    async function fetchMarkets(kind = "new", limit = 5) {
+      try {
+        const res = await fetch(`/api/markets?kind=${encodeURIComponent(kind)}&limit=${limit}`);
+        if (!res.ok) throw new Error("http " + res.status);
+        const data = await res.json();
+        return Array.isArray(data) ? data : (data.markets || []);
+      } catch (err) {
+        console.error("fetchMarkets error", err);
+        return [];
+      }
+    }
+
+    function formatDollarsShort(value) {
+      const n = Number(value || 0);
+      if (!isFinite(n)) return "N/A";
+      if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
+      if (n >= 1_000) return "$" + (n / 1_000).toFixed(1) + "k";
+      return "$" + n.toFixed(1);
+    }
+
+    function formatEnds(endDateIso) {
+      if (!endDateIso) return "N/A";
+      const d = new Date(endDateIso);
+      if (isNaN(d.getTime())) return "N/A";
+
+      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const day = d.getDate();
+      const suffix = (day % 10 === 1 && day !== 11) ? "st"
+        : (day % 10 === 2 && day !== 12) ? "nd"
+        : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+
+      return `${monthNames[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()}`;
+    }
+
+    function computeYesNoPrices(market) {
+      const p = market.bestAsk ?? market.lastTradePrice ?? null;
+      if (p == null) {
+        return { yes: "50.00c", no: "50.00c" };
+      }
+      const yesCents = p * 100;
+      const noCents = 100 - yesCents;
+      return {
+        yes: yesCents.toFixed(2) + "c",
+        no: noCents.toFixed(2) + "c"
+      };
+    }
+
+    function renderMarketsList(markets) {
+      const container = document.getElementById("marketsList");
+      if (!markets.length) {
+        container.textContent = "No markets found.";
+        return;
+      }
+
+      container.innerHTML = "";
+      markets.slice(0, 10).forEach((m, idx) => {
+        const div = document.createElement("div");
+        div.className = "market-item";
+
+        const title = m.question || m.title || "Untitled market";
+        const liquidity = m.liquidityNum ?? m.liquidity ?? m.liquidityClob ?? m.liquidityAmm;
+        const volume = m.volume24hr ?? m.volumeNum ?? m.volume ?? null;
+        const end = m.endDateIso ?? m.endDate ?? null;
+        const prices = computeYesNoPrices(m);
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "market-title";
+        titleEl.textContent = `${idx + 1}. ${title}`;
+        titleEl.addEventListener("click", () => openBuySheet(title, prices, m));
+        div.appendChild(titleEl);
+
+        const liqRow = document.createElement("div");
+        liqRow.className = "market-line";
+        liqRow.innerHTML =
+          `<span class="market-label">📈 Liquidity:</span> <span class="market-value">${formatDollarsShort(liquidity)}</span>`;
+        div.appendChild(liqRow);
+
+        const volRow = document.createElement("div");
+        volRow.className = "market-line";
+        volRow.innerHTML =
+          `<span class="market-label">🚀 Volume:</span> <span class="market-value">${volume != null ? formatDollarsShort(volume) : "N/A"}</span>`;
+        div.appendChild(volRow);
+
+        const endsRow = document.createElement("div");
+        endsRow.className = "market-line";
+        endsRow.innerHTML =
+          `<span class="market-label">📅 Ends:</span> <span class="market-value">${formatEnds(end)}</span>`;
+        div.appendChild(endsRow);
+
+        const priceRow = document.createElement("div");
+        priceRow.className = "market-line";
+        priceRow.innerHTML =
+          `<span class="market-label">💰 Cost YES:</span> <span class="market-value">${prices.yes}</span> · ` +
+          `<span class="market-label">Cost NO:</span> <span class="market-value">${prices.no}</span>`;
+        div.appendChild(priceRow);
+
+        container.appendChild(div);
+      });
+    }
+
+    // -------- Buy sheet (detail) --------
+    function openBuySheet(title, prices, market) {
+      appState.currentMarket = market;
+      const sheet = document.getElementById("buySheet");
+      document.getElementById("buyTitle").textContent = title;
+      document.getElementById("buySubtitle").textContent =
+        "Status: Open · Place an order via Polymarket CLOB (if configured).";
+      document.getElementById("buyPriceRow").textContent =
+        `Yes: ${prices.yes} · No: ${prices.no}`;
+      sheet.classList.add("visible");
+    }
+
+    function closeBuySheet() {
+      const sheet = document.getElementById("buySheet");
+      sheet.classList.remove("visible");
+      appState.currentMarket = null;
+    }
+
+    async function placeOrderForCurrentMarket(outcomeSide) {
+      const m = appState.currentMarket;
+      if (!m) {
+        alert("No market selected.");
+        return;
+      }
+      const tokenIds = m.clobTokenIds || m.tokenIds || [];
+      if (!tokenIds.length) {
+        alert("This market does not expose CLOB token IDs in the payload.");
+        return;
+      }
+
+      const [yesTokenId, noTokenId] = tokenIds;
+      const tokenId = outcomeSide === "YES" ? yesTokenId : noTokenId;
+
+      const size = 10;   // demo: 10 shares
+      const price = 0.5; // demo: $0.50
+
+      try {
+        const res = await fetch("/api/trade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tokenId,
+            side: "BUY",
+            price,
+            size,
+            tickSize: "0.001",
+            negRisk: !!m.negativeRisk,
+          }),
+        });
+
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          console.error("Trade failed", json);
+          alert("Order failed: " + (json.error || "unknown error"));
+          return;
+        }
+
+        alert("Order submitted ✅");
+        closeBuySheet();
+      } catch (e) {
+        console.error(e);
+        alert("Network error while placing order");
+      }
+    }
+
+    // -------- Portfolio --------
+    async function loadPortfolioSection(section) {
+      if (!appState.polygonAddress) {
+        alert("Wallet not ready yet.");
+        return;
+      }
+
+      const addr = appState.polygonAddress;
+      let endpoint;
+      if (section === "positions") endpoint = "/api/positions";
+      else if (section === "orders") endpoint = "/api/trades";
+      else endpoint = "/api/activity";
+
+      const bodyEl = document.getElementById("portfolioBody");
+      bodyEl.textContent = "Loading…";
+
+      try {
+        const res = await fetch(`${endpoint}?user=${encodeURIComponent(addr)}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Request failed");
+
+        if (section === "positions") {
+          renderPositions(bodyEl, json.positions || []);
+        } else if (section === "orders") {
+          renderTrades(bodyEl, json.trades || []);
+        } else {
+          renderActivity(bodyEl, json.activity || []);
+        }
+      } catch (e) {
+        console.error(e);
+        bodyEl.textContent = "Error loading data.";
+      }
+    }
+
+    function renderPositions(container, positions) {
+      if (!positions.length) {
+        container.textContent = "No open positions.";
+        return;
+      }
+      const lines = positions.slice(0, 10).map((p, i) => {
+        const sz = Number(p.size || 0).toFixed(2);
+        const pnl = Number(p.cashPnl || 0).toFixed(2);
+        return `${i + 1}. ${p.title || p.slug} – ${p.outcome} | Size: ${sz} | PnL: $${pnl}`;
+      });
+      container.textContent = lines.join("\n");
+    }
+
+    function renderTrades(container, trades) {
+      if (!trades.length) {
+        container.textContent = "No trades yet.";
+        return;
+      }
+      const lines = trades.slice(0, 10).map((t, i) => {
+        const sz = Number(t.size || 0).toFixed(2);
+        const px = Number(t.price || 0).toFixed(3);
+        return `${i + 1}. ${t.title || t.slug} – ${t.outcome} – ${t.side} ${sz} @ $${px}`;
+      });
+      container.textContent = lines.join("\n");
+    }
+
+    function renderActivity(container, activity) {
+      if (!activity.length) {
+        container.textContent = "No activity yet.";
+        return;
+      }
+      const lines = activity.slice(0, 10).map((a, i) => {
+        const ts = a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "";
+        const kind = a.type || "EVENT";
+        return `${i + 1}. [${kind}] ${a.title || a.slug} – ${a.outcome || ""} – ${ts}`;
+      });
+      container.textContent = lines.join("\n");
+    }
+
+    // -------- UI init --------
+    function initUI() {
+      const wallets = loadOrCreateWallets();
+
+      const polygonAddressEl = document.getElementById("polygonAddress");
+      const solanaAddressEl = document.getElementById("solanaAddress");
+
+      polygonAddressEl.textContent = truncateAddress(wallets.polygon.address);
+      polygonAddressEl.addEventListener("click", () => {
+        copyToClipboard(wallets.polygon.address);
+        tg?.HapticFeedback?.impactOccurred("light");
+      });
+
+      solanaAddressEl.textContent = truncateAddress(wallets.solana.publicKey);
+      solanaAddressEl.addEventListener("click", () => {
+        copyToClipboard(wallets.solana.publicKey);
+        tg?.HapticFeedback?.impactOccurred("light");
+      });
+
+      appState.polygonAddress = wallets.polygon.address;
+
+      const tsEl = document.getElementById("timestamp");
+      const now = new Date();
+      tsEl.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+      refreshServerBalances(wallets.polygon.address);
+
+      // Deposit + nav buttons
+      document.getElementById("depositBtn").onclick = async () => {
+        const resp = await fetchDepositAddresses(wallets.polygon.address);
+        if (!resp) return;
+
+        const lines = (resp.depositAddresses || []).map((d) =>
+          `${d.chainName || d.chain || ""} – ${d.tokenSymbol || ""}\n${d.depositAddress}`
+        );
+
+        const msg =
+          "Send supported tokens to one of these addresses:\n\n" +
+          (lines.length ? lines.join("\n\n") : "No deposit routes received.");
+
+        if (tg) tg.showAlert(msg.slice(0, 1024));
+        else alert(msg);
+      };
+
+      document.getElementById("marketsBtn").onclick = () =>
+        document.getElementById("marketsCard").scrollIntoView({ behavior: "smooth" });
+
+      document.getElementById("guideBtn").onclick = () =>
+        tg?.openLink?.("https://docs.polymarket.com/polymarket-learn/get-started/how-to-deposit");
+
+      document.getElementById("portfolioBtn").onclick = () =>
+        document.querySelectorAll(".card")[2].scrollIntoView({ behavior: "smooth" });
+
+      document.getElementById("walletsBtn").onclick = () =>
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+      document.getElementById("updatesBtn").onclick = () =>
+        tg?.openLink?.("https://docs.polymarket.com/changelog");
+
+      document.getElementById("inviteBtn").onclick = () =>
+        tg?.openTelegramLink?.("https://t.me/polysightbot");
+
+      // Markets filters
+      document.querySelectorAll("[data-markets-filter]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const kind = btn.getAttribute("data-markets-filter");
+          if (kind === "search" || kind === "category") {
+            tg?.showAlert?.("Search & category filters coming soon in the mini app.");
+            return;
+          }
+
+          const markets = await fetchMarkets(kind === "new" ? "new" : kind, 10);
+          renderMarketsList(markets);
+        });
+      });
+
+      // Load default "New" markets
+      fetchMarkets("new", 10).then(renderMarketsList);
+
+      // Portfolio buttons
+      document.getElementById("positionsBtn").onclick = () =>
+        loadPortfolioSection("positions");
+      document.getElementById("ordersBtn").onclick = () =>
+        loadPortfolioSection("orders");
+      document.getElementById("historyBtn").onclick = () =>
+        loadPortfolioSection("history");
+
+      // Buy sheet buttons
+      document.getElementById("buyYesBtn").onclick = () =>
+        placeOrderForCurrentMarket("YES");
+      document.getElementById("buyNoBtn").onclick = () =>
+        placeOrderForCurrentMarket("NO");
+
+      // Close sheet if user taps outside
+      document.getElementById("buySheet").addEventListener("click", (e) => {
+        if (e.target.id === "buySheet") closeBuySheet();
+      });
+
+      // Close on ESC
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeBuySheet();
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", initUI);
+  </script>
 </body>
 </html>
