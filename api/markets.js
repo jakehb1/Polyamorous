@@ -50,6 +50,7 @@ module.exports = async (req, res) => {
     }
 
     const data = await resp.json();
+    // Gamma returns a JSON array of markets – this is live data from Polymarket
     return res.status(200).json(data);
   } catch (err) {
     console.error("markets error", err);
