@@ -800,21 +800,26 @@
     }
 
     // -------- Markets --------
-    async function fetchMarkets(kind = "new", limit = 5) {
-      const statusEl = document.getElementById("marketsStatus");
-      try {
-        statusEl.textContent = `Loading ${kind} markets…`;
-        const res = await fetch(`/api/markets?kind=${encodeURIComponent(kind)}&limit=${limit}`);
-        if (!res.ok) throw new Error("http " + res.status);
-        const data = await res.json();
-        statusEl.textContent = `Showing ${kind} markets`;
-        return Array.isArray(data) ? data : (data.markets || []);
-      } catch (err) {
-        console.error("fetchMarkets error", err);
-        statusEl.textContent = "Error loading markets.";
-        return [];
-      }
-    }
+   async function fetchMarkets(kind = "new", limit = 5, categorySlug = null) {
+  const statusEl = document.getElementById("marketsStatus");
+  try {
+    const qs = new URLSearchParams();
+    qs.set("kind", kind);
+    qs.set("limit", String(limit));
+    if (categorySlug) qs.set("category", categorySlug);
+
+    statusEl.textContent = `Loading ${kind} markets…`;
+    const res = await fetch(`/api/markets?${qs.toString()}`);
+    if (!res.ok) throw new Error("http " + res.status);
+    const data = await res.json();
+    statusEl.textContent = `Showing ${kind} markets`;
+    return Array.isArray(data) ? data : (data.markets || []);
+  } catch (err) {
+    console.error("fetchMarkets error", err);
+    statusEl.textContent = "Error loading markets.";
+    return [];
+  }
+}
 
     function formatDollarsShort(value) {
       const n = Number(value || 0);
