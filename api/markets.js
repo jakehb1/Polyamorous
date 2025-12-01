@@ -1,9 +1,9 @@
 // api/markets.js
 // Proxy to Polymarket Gamma /markets endpoint with simple sorting presets.
 //
-// kind=new      -> newest markets by createdAt desc
-// kind=trending -> markets by 24h volume desc
-// kind=volume   -> markets by total volume desc
+// kind=new      -> newest active markets
+// kind=trending -> active markets by 24h volume desc
+// kind=volume   -> active markets by total volume desc
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -21,6 +21,10 @@ module.exports = async (req, res) => {
 
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+
+  // Only live markets
+  params.set("active", "true");   // only active markets
+  params.set("closed", "false");  // exclude resolved/closed
 
   // Choose sort based on kind
   if (kind === "trending") {
@@ -50,7 +54,7 @@ module.exports = async (req, res) => {
     }
 
     const data = await resp.json();
-    // Gamma returns a JSON array of markets – this is live data from Polymarket
+    // Gamma returns an array of markets – we just pass it straight through.
     return res.status(200).json(data);
   } catch (err) {
     console.error("markets error", err);
