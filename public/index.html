@@ -5,62 +5,115 @@
   <title>Polyamorous – Polymarket Mini App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <style>
+    <style>
     :root {
       /* Light theme defaults */
       --bg: #f4f4f5;
+      --bg-radial-1: #e0f2fe;
+      --bg-radial-2: #f4f4f5;
+      --bg-radial-3: #e5e7eb;
       --card-bg: #ffffff;
-      --card-outline: #e4e4e7;
-      --text-primary: #111827;
+      --card-outline: rgba(148, 163, 184, 0.5);
+      --card-glow: rgba(129, 140, 248, 0.27);
+      --text-primary: #020617;
       --text-secondary: #6b7280;
-      --button-bg: #f3f4f6;
+      --button-bg: #f9fafb;
       --button-border: #e5e7eb;
-      --button-text: #111827;
-      --pill-bg: #f9fafb;
+      --button-text: #020617;
+      --pill-bg: #f1f5f9;
       --accent: #2563eb;
       --accent-soft: #dbeafe;
+      --accent-strong: #4f46e5;
+      --danger: #ef4444;
+      --radius-card: 20px;
     }
 
     /* Dark theme overrides when body has .theme-dark */
     body.theme-dark {
       --bg: #020617;
-      --card-bg: #020617;
-      --card-outline: #1e293b;
+      --bg-radial-1: #0b1120;
+      --bg-radial-2: #020617;
+      --bg-radial-3: #000000;
+      --card-bg: rgba(15, 23, 42, 0.92);
+      --card-outline: rgba(30, 64, 175, 0.45);
+      --card-glow: rgba(59, 130, 246, 0.4);
       --text-primary: #e5e7eb;
       --text-secondary: #9ca3af;
-      --button-bg: #111827;
+      --button-bg: #020617;
       --button-border: #1f2937;
       --button-text: #e5e7eb;
       --pill-bg: #020617;
       --accent: #38bdf8;
       --accent-soft: #0f172a;
+      --accent-strong: #6366f1;
+      --danger: #f97373;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
       padding: 16px;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
         "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, var(--bg) 0, var(--bg) 50%, var(--bg) 100%);
+      background:
+        radial-gradient(circle at 0% 0%, var(--bg-radial-1) 0, transparent 45%),
+        radial-gradient(circle at 100% 0%, var(--bg-radial-2) 0, transparent 45%),
+        radial-gradient(circle at 50% 100%, var(--bg-radial-3) 0, var(--bg) 60%);
       color: var(--text-primary);
-      transition: background 0.2s ease, color 0.2s ease;
+      transition: background 0.25s ease, color 0.25s ease;
+      min-height: 100vh;
     }
 
     .app {
       max-width: 420px;
-      margin: 0 auto 40px;
+      margin: 4px auto 40px;
     }
 
     .card {
-      background: var(--card-bg);
-      border-radius: 18px;
+      position: relative;
+      background: radial-gradient(circle at -10% -10%, rgba(129, 140, 248, 0.09), transparent 45%),
+                  radial-gradient(circle at 110% 120%, rgba(45, 212, 191, 0.07), transparent 45%),
+                  var(--card-bg);
+      border-radius: var(--radius-card);
       padding: 16px 16px 12px;
       border: 1px solid var(--card-outline);
-      box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08);
-      margin-bottom: 12px;
-      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow:
+        0 18px 35px rgba(15, 23, 42, 0.11),
+        0 0 0 1px rgba(148, 163, 184, 0.14);
+      margin-bottom: 14px;
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        border-color 0.15s ease,
+        background 0.25s ease;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 0 0, rgba(250, 204, 21, 0.25), transparent 55%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 22px 45px rgba(15, 23, 42, 0.18),
+        0 0 0 1px var(--card-glow);
+      border-color: rgba(129, 140, 248, 0.65);
+    }
+
+    .card:hover::before {
+      opacity: 0.75;
     }
 
     .card-header-row {
@@ -72,11 +125,23 @@
     }
 
     .card-header {
-      font-weight: 700;
+      font-weight: 800;
       font-size: 15px;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-header::before {
+      content: "";
+      width: 6px;
+      height: 20px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #f59e0b, #f97316, #22c55e);
+      box-shadow: 0 0 0 1px rgba(248, 250, 252, 0.9);
     }
 
     .card-subtitle {
@@ -90,7 +155,7 @@
       font-size: 11px;
       border-radius: 999px;
       border: 1px solid var(--button-border);
-      background: var(--button-bg);
+      background: radial-gradient(circle at 0 0, rgba(251, 191, 36, 0.18), transparent 60%), var(--button-bg);
       color: var(--text-secondary);
       padding: 4px 8px;
       cursor: pointer;
@@ -98,19 +163,33 @@
       align-items: center;
       gap: 4px;
       white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s ease;
     }
 
     .theme-toggle span {
       font-size: 13px;
     }
 
+    .theme-toggle:active {
+      transform: translateY(1px);
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+    }
+
     .section-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.14em;
       margin: 10px 0 6px;
       text-transform: uppercase;
       color: var(--text-secondary);
+    }
+
+    .section-title::before {
+      content: "✶";
+      margin-right: 4px;
+      color: var(--accent);
+      opacity: 0.8;
     }
 
     .wallet-line {
@@ -127,7 +206,9 @@
       color: var(--text-primary);
     }
 
-    .wallet-emoji { font-size: 16px; }
+    .wallet-emoji {
+      font-size: 16px;
+    }
 
     .wallet-address {
       display: inline-flex;
@@ -147,19 +228,39 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      position: relative;
     }
 
-    .balances { margin-top: 4px; }
+    .wallet-address::after {
+      content: "Tap to copy";
+      position: absolute;
+      right: 10px;
+      font-size: 10px;
+      color: rgba(148, 163, 184, 0.85);
+    }
+
+    .balances {
+      margin-top: 4px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 0 0, rgba(59, 130, 246, 0.09), transparent 55%), rgba(248, 250, 252, 0.65);
+    }
+
+    body.theme-dark .balances {
+      background: radial-gradient(circle at 0 0, rgba(59, 130, 246, 0.16), transparent 55%), rgba(15, 23, 42, 0.9);
+    }
 
     .balance-row {
       display: flex;
       align-items: baseline;
       gap: 6px;
       font-size: 13px;
-      margin-bottom: 2px;
+      margin-bottom: 3px;
     }
 
-    .balance-dot { font-size: 14px; }
+    .balance-dot {
+      font-size: 14px;
+    }
 
     .balance-label {
       flex: 1;
@@ -169,7 +270,7 @@
     .balance-value {
       font-variant-numeric: tabular-nums;
       color: var(--text-primary);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .timestamp {
@@ -191,52 +292,77 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 12px 10px;
-      border-radius: 12px;
+      padding: 11px 10px;
+      border-radius: 999px;
       border: 1px solid var(--button-border);
       background: var(--button-bg);
       color: var(--button-text);
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.1em;
       cursor: pointer;
       outline: none;
-      transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+      transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.1s ease,
+        box-shadow 0.15s ease;
     }
 
-    .btn span.icon { font-size: 18px; }
+    .btn span.icon {
+      font-size: 18px;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, rgba(148, 163, 184, 0.11), transparent);
+      box-shadow: 0 9px 20px rgba(15, 23, 42, 0.16);
+      transform: translateY(-1px);
+    }
 
     .btn:active {
       transform: translateY(1px);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #facc15, #fb923c);
+      background: linear-gradient(135deg, #facc15, #fb923c, #22c55e);
       color: #111827;
       border-color: transparent;
-      box-shadow: 0 10px 25px rgba(251, 191, 36, 0.35);
+      box-shadow:
+        0 13px 28px rgba(251, 191, 36, 0.35),
+        0 0 0 1px rgba(253, 224, 71, 0.6);
     }
 
-    .btn-deposit { grid-column: span 2; }
+    .btn-primary:hover {
+      box-shadow:
+        0 18px 36px rgba(251, 191, 36, 0.55),
+        0 0 0 1px rgba(251, 146, 60, 0.8);
+    }
+
+    .btn-deposit {
+      grid-column: span 2;
+    }
 
     .btn-small {
       padding: 8px 10px;
       font-size: 12px;
       text-transform: none;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
     }
 
     .markets-filters {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 10px;
     }
 
     .markets-filters .btn {
       font-size: 12px;
       padding: 8px 6px;
+      border-radius: 999px;
+      background: var(--pill-bg);
     }
 
     .markets-filters .btn-wide {
@@ -254,14 +380,27 @@
     }
 
     .market-item {
-      margin-bottom: 8px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(248, 250, 252, 0.8);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
     }
 
-    .market-item:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
+    body.theme-dark .market-item {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(30, 64, 175, 0.7);
+    }
+
+    .market-item:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    body.theme-dark .market-item:hover {
+      background: rgba(15, 23, 42, 0.98);
     }
 
     .market-title {
@@ -269,7 +408,7 @@
       margin-bottom: 2px;
       text-decoration: underline;
       cursor: pointer;
-      color: var(--accent);
+      color: var(--accent-strong);
     }
 
     .market-line {
@@ -289,7 +428,34 @@
     .markets-status {
       font-size: 11px;
       color: var(--text-secondary);
-      margin-top: 4px;
+      margin-top: 6px;
+    }
+
+    .portfolio-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .portfolio-buttons .btn-wide {
+      grid-column: span 2;
+    }
+
+    .portfolio-body {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(248, 250, 252, 0.7);
+      border: 1px dashed rgba(209, 213, 219, 0.9);
+    }
+
+    body.theme-dark .portfolio-body {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: rgba(55, 65, 81, 0.9);
     }
 
     .buy-sheet {
@@ -302,10 +468,12 @@
       padding: 12px 16px 16px;
       background: var(--card-bg);
       border-top: 1px solid var(--card-outline);
-      box-shadow: 0 -14px 30px rgba(15, 23, 42, 0.18);
+      box-shadow: 0 -18px 40px rgba(15, 23, 42, 0.5);
       border-radius: 18px 18px 0 0;
       z-index: 20;
       display: none;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
     }
 
     .buy-sheet.visible {
@@ -338,28 +506,17 @@
       margin-top: 8px;
     }
 
-    .portfolio-buttons {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .portfolio-buttons .btn-wide {
-      grid-column: span 2;
-    }
-
-    .portfolio-body {
-      margin-top: 8px;
-      font-size: 12px;
-      color: var(--text-secondary);
-      white-space: pre-wrap;
-    }
-
     @media (max-width: 360px) {
-      body { padding: 10px; }
-      .btn { font-size: 13px; padding-block: 10px; }
-      .wallet-address { font-size: 11px; }
+      body {
+        padding: 10px;
+      }
+      .btn {
+        font-size: 12px;
+        padding-block: 9px;
+      }
+      .wallet-address {
+        font-size: 11px;
+      }
     }
   </style>
 </head>
