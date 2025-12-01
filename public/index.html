@@ -700,11 +700,11 @@
         Browse markets on Polyamorous by trend, volume, recency, or category.
       </div>
       <ul style="margin: 6px 0 0 18px; padding: 0; font-size: 13px; color: var(--text-secondary);">
-        <li>🔥 Trending – Hot markets by 24h volume</li>
-        <li>📈 Volume – Markets by recent 24h volume</li>
-        <li>🆕 New – Recently created markets</li>
-        <li>📂 Category – Browse by category</li>
-        <li>🔍 Search – Search by keywords (coming soon)</li>
+        <li>🔥 Trending – by 24h volume</li>
+        <li>📈 Volume – by total volume</li>
+        <li>🆕 New – recently created</li>
+        <li>📂 Category – by category</li>
+        <li>🔍 Search – (coming soon)</li>
       </ul>
 
       <div class="markets-filters">
@@ -907,36 +907,9 @@
       };
     }
 
-    // Local safety filter to drop old / dead markets even if backend missed any
-    function filterMarketsLocally(markets, kind) {
-      const now = Date.now();
-      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-      const MAX_AGE_DAYS = 90;
-      const maxAgeMs = MAX_AGE_DAYS * ONE_DAY_MS;
-
-      return markets.filter((m) => {
-        if (typeof m.closed === "boolean" && m.closed) return false;
-        if (typeof m.active === "boolean" && !m.active) return false;
-
-        const endStr = m.endDateIso || m.endDate;
-        if (endStr) {
-          const t = Date.parse(endStr);
-          if (!Number.isNaN(t) && t < now - ONE_DAY_MS) return false;
-        }
-
-        const createdStr = m.createdAt || m.created_at;
-        if (createdStr) {
-          const t = Date.parse(createdStr);
-          if (!Number.isNaN(t) && t < now - maxAgeMs) return false;
-        }
-
-        const vol24 = Number(m.volume24hr ?? m.volume24Hrs ?? 0);
-        if (kind === "trending" || kind === "volume") {
-          if (!Number.isFinite(vol24) || vol24 <= 0) return false;
-        }
-
-        return true;
-      });
+    // local pass-through; backend handles filtering
+    function filterMarketsLocally(markets) {
+      return markets || [];
     }
 
     // -------- Fetch markets (with category support) --------
@@ -953,7 +926,7 @@
         if (!res.ok) throw new Error("http " + res.status);
         const data = await res.json();
         let markets = Array.isArray(data) ? data : (data.markets || []);
-        markets = filterMarketsLocally(markets, kind);
+        markets = filterMarketsLocally(markets);
         statusEl.textContent = `Showing ${kind} markets`;
         return markets;
       } catch (err) {
