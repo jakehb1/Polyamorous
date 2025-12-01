@@ -1,6 +1,6 @@
 // api/categories.js
-// Derive a category list from open Polymarket markets (closed=false).
-// Keeps it simple and in sync with api/markets.js.
+// Derive a category list from open Polymarket markets.
+// Very forgiving: just looks for category-ish fields and aggregates.
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -13,6 +13,13 @@ module.exports = async (req, res) => {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "method_not_allowed" });
   }
+
+  // helper to normalize to a slug we can consistently reuse
+  const normalizeSlug = (s) =>
+    String(s || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
 
   const params = new URLSearchParams();
   params.set("limit", "500");
@@ -31,49 +38,36 @@ module.exports = async (req, res) => {
     }
 
     const data = await resp.json();
-    const markets = Array.isArray(data) ? data : (data.markets || []);
-
-    const now = Date.now();
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-    function normCategory(cat) {
-      if (!cat) return "";
-      return String(cat).trim().toLowerCase().replace(/\s+/g, "-");
-    }
+    const markets = Array.isArray(data) ? data : data.markets || [];
 
     const bucket = new Map();
 
     for (const m of markets) {
-      // light "ended long ago" filter, same as markets.js
-      const endStr = m.endDateIso || m.endDate;
-      if (endStr) {
-        const t = Date.parse(endStr);
-        if (!Number.isNaN(t) && t < now - ONE_DAY_MS) continue;
-      }
-
       const names = [];
 
-      // simple category string
+      // 1) simple top-level category
       if (m.category) names.push(m.category);
 
-      // categories array with objects: { label, slug, ... } 
+      // 2) categories array: could be strings or objects
       if (Array.isArray(m.categories)) {
         for (const cat of m.categories) {
           if (!cat) continue;
           if (typeof cat === "string") {
             names.push(cat);
           } else {
-            if (cat.slug) names.push(cat.slug);
+            // Gamma often uses { label, slug, ... } style
             if (cat.label) names.push(cat.label);
+            if (cat.slug) names.push(cat.slug);
+            if (cat.name) names.push(cat.name);
           }
         }
       }
 
       for (const raw of names) {
-        const slug = normCategory(raw);
+        const slug = normalizeSlug(raw);
         if (!slug) continue;
-        const label = String(raw).trim();
 
+        const label = String(raw).trim();
         const existing = bucket.get(slug);
         if (existing) {
           existing.count += 1;
