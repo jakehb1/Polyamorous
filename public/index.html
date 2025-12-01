@@ -275,32 +275,32 @@
     }
 
     .wallet-address {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
-        "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
-      padding: 6px 10px;
-      background: var(--pill-bg);
-      border-radius: 999px;
-      border: 1px solid var(--button-border);
-      color: var(--text-secondary);
-      cursor: pointer;
-      user-select: all;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  padding: 6px 10px;
+  background: var(--pill-bg);
+  border-radius: 12px;
+  border: 1px solid var(--button-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: all;
+  max-width: 100%;
+  /* show full address, allow wrapping */
+  white-space: normal;
+  word-break: break-all;
+  overflow: visible;
+  position: relative;
+
     }
 
     .wallet-address::after {
-      content: "Tap to copy";
-      position: absolute;
-      right: 10px;
-      font-size: 10px;
-      color: rgba(148, 163, 184, 0.85);
+  content: "";
+
     }
 
     .balances {
