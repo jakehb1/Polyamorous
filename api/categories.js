@@ -1,6 +1,6 @@
 // api/categories.js
-// Derive a category list from open Polymarket markets.
-// Very forgiving: just looks for category-ish fields and aggregates.
+// Build a live category list from Polymarket Gamma events.
+// This is 100% driven by Polymarket data (no static list).
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -14,18 +14,32 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  // helper to normalize to a slug we can consistently reuse
-  const normalizeSlug = (s) =>
+  // helper to normalize Polymarket category labels into slugs
+  const toSlug = (s) =>
     String(s || "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-");
 
-  const params = new URLSearchParams();
-  params.set("limit", "500");
-  params.set("closed", "false"); // only open markets
+  // optional: add emojis to known Polymarket categories
+  const withEmoji = (slug, label) => {
+    const lower = label.toLowerCase();
+    if (lower.includes("politic")) return `🏛️ ${label}`;
+    if (lower.includes("sport")) return `⚽ ${label}`;
+    if (lower.includes("crypto") || lower.includes("defi")) return `₿ ${label}`;
+    if (lower.includes("finance") || lower.includes("economy")) return `💰 ${label}`;
+    if (lower.includes("world") || lower.includes("geopolitic")) return `🌍 ${label}`;
+    if (lower.includes("tech")) return `💻 ${label}`;
+    if (lower.includes("culture") || lower.includes("entertainment")) return `🎭 ${label}`;
+    return label;
+  };
 
-  const url = `https://gamma-api.polymarket.com/markets?${params.toString()}`;
+  // pull a decent sample of live-ish events
+  const params = new URLSearchParams();
+  params.set("limit", "300");
+  params.set("closed", "false");
+
+  const url = `https://gamma-api.polymarket.com/events?${params.toString()}`;
 
   try {
     const resp = await fetch(url);
@@ -38,33 +52,32 @@ module.exports = async (req, res) => {
     }
 
     const data = await resp.json();
-    const markets = Array.isArray(data) ? data : data.markets || [];
+    const events = Array.isArray(data) ? data : data.events || [];
 
     const bucket = new Map();
 
-    for (const m of markets) {
+    for (const ev of events) {
       const names = [];
 
-      // 1) simple top-level category
-      if (m.category) names.push(m.category);
+      // simple string category on the event
+      if (ev.category) names.push(ev.category);
 
-      // 2) categories array: could be strings or objects
-      if (Array.isArray(m.categories)) {
-        for (const cat of m.categories) {
+      // structured categories array on the event
+      if (Array.isArray(ev.categories)) {
+        for (const cat of ev.categories) {
           if (!cat) continue;
           if (typeof cat === "string") {
             names.push(cat);
           } else {
-            // Gamma often uses { label, slug, ... } style
             if (cat.label) names.push(cat.label);
-            if (cat.slug) names.push(cat.slug);
-            if (cat.name) names.push(cat.name);
+            else if (cat.slug) names.push(cat.slug);
+            else if (cat.name) names.push(cat.name);
           }
         }
       }
 
       for (const raw of names) {
-        const slug = normalizeSlug(raw);
+        const slug = toSlug(raw);
         if (!slug) continue;
 
         const label = String(raw).trim();
@@ -79,7 +92,11 @@ module.exports = async (req, res) => {
 
     const categories = Array.from(bucket.values())
       .sort((a, b) => b.count - a.count)
-      .slice(0, 25);
+      .slice(0, 24) // top N
+      .map((c) => ({
+        slug: c.slug,
+        label: withEmoji(c.slug, c.label),
+      }));
 
     return res.status(200).json({ categories });
   } catch (err) {
