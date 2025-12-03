@@ -329,6 +329,18 @@ module.exports = async (req, res) => {
       }
       outcomePrices = (outcomePrices || []).map(p => parseFloat(p) || 0);
       
+      // Parse outcomes - can be string or array
+      let outcomes = m.outcomes || ["Yes", "No"];
+      if (typeof outcomes === 'string') {
+        try { outcomes = JSON.parse(outcomes); } catch(e) { 
+          // If parsing fails, try splitting by comma
+          outcomes = outcomes.split(',').map(o => o.trim()).filter(o => o);
+        }
+      }
+      if (!Array.isArray(outcomes) || outcomes.length === 0) {
+        outcomes = ["Yes", "No"];
+      }
+      
       return {
         id: m.id || m.conditionId,
         conditionId: m.conditionId,
@@ -338,7 +350,7 @@ module.exports = async (req, res) => {
         volume: parseFloat(m.volume) || 0,
         volume24hr: parseFloat(m.volume24hr) || 0,
         liquidity: parseFloat(m.liquidity) || 0,
-        outcomes: m.outcomes || ["Yes", "No"],
+        outcomes: outcomes,
         outcomePrices: outcomePrices,
         clobTokenIds: m.clobTokenIds || [],
       };

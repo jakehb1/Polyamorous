@@ -649,10 +649,11 @@
       margin-bottom: 20px;
     }
     .trade-market-img {
-      width: 48px;
-      height: 48px;
-      border-radius: 10px;
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
       object-fit: cover;
+      flex-shrink: 0;
     }
     .trade-market-question {
       font-size: 14px;
@@ -661,41 +662,56 @@
       color: var(--text);
     }
     
-    .trade-sides {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    .trade-outcomes {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       margin-bottom: 20px;
     }
-    .trade-side {
-      padding: 16px;
+    .trade-outcome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
       border-radius: var(--radius-sm);
-      text-align: center;
       cursor: pointer;
       border: 2px solid var(--border);
       transition: all 0.2s;
       background: var(--bg);
     }
-    .trade-side.yes.active { 
+    .trade-outcome.active { 
       border-color: var(--green); 
       background: var(--green-soft);
     }
-    .trade-side.no.active { 
-      border-color: var(--red); 
-      background: #fef2f2;
+    .trade-outcome-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
     }
-    .trade-side-label {
-      font-size: 16px;
+    .trade-outcome-label {
+      font-size: 15px;
       font-weight: 600;
-      margin-bottom: 4px;
       color: var(--text);
+      flex: 1;
     }
-    .trade-side-price {
-      font-size: 24px;
+    .trade-outcome-percent {
+      font-size: 16px;
       font-weight: 700;
+      color: var(--text);
+      min-width: 50px;
+      text-align: right;
     }
-    .trade-side.yes .trade-side-price { color: #22c55e; }
-    .trade-side.no .trade-side-price { color: #ef4444; }
+    .trade-outcome-price {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--green);
+      min-width: 60px;
+      text-align: right;
+    }
+    .trade-outcome.active .trade-outcome-price {
+      color: var(--accent);
+    }
     
     .trade-amount {
       margin-bottom: 20px;
@@ -865,14 +881,6 @@
         </div>
       </div>
       <div class="wallet-status" id="walletStatusBar">Checking status...</div>
-      <div class="wallet-actions">
-        <button class="wallet-btn green" id="depositBtn">Deposit</button>
-        <button class="wallet-btn dark" id="withdrawBtn">Withdraw</button>
-      </div>
-      <div class="wallet-actions-bottom">
-        <button class="wallet-btn dark" id="tradeBtn">Trade</button>
-        <button class="wallet-btn dark" id="refreshButton">Refresh</button>
-      </div>
     </div>
 
     <!-- Markets Card -->
@@ -897,19 +905,12 @@
       <p class="modal-subtitle">Select your position and amount</p>
       
       <div class="trade-market-info" id="tradeMarketInfo">
-        <img class="trade-market-img" id="tradeMarketImg" src="" alt="" />
+        <img class="trade-market-img" id="tradeMarketImg" src="" alt="" onerror="this.style.display='none'" />
         <div class="trade-market-question" id="tradeMarketQuestion"></div>
       </div>
       
-      <div class="trade-sides">
-        <div class="trade-side yes active" data-side="yes">
-          <div class="trade-side-label">Yes</div>
-          <div class="trade-side-price" id="yesPrice">--¢</div>
-        </div>
-        <div class="trade-side no" data-side="no">
-          <div class="trade-side-label">No</div>
-          <div class="trade-side-price" id="noPrice">--¢</div>
-        </div>
+      <div class="trade-outcomes" id="tradeOutcomes">
+        <!-- Outcomes will be dynamically generated -->
       </div>
       
       <div class="trade-amount">
@@ -947,6 +948,7 @@
       selectedMarket: null,
       selectedCategory: null,
       tradeSide: 'yes',
+      selectedOutcomeIndex: 0,
     };
 
     // =====================
@@ -1338,18 +1340,65 @@
     // =====================
     function openTradeModal(market) {
       state.selectedMarket = market;
-      state.tradeSide = 'yes';
-
-      const prices = market.outcomePrices || [];
-      const yesPrice = prices[0] ? (parseFloat(prices[0]) * 100).toFixed(0) : '--';
-      const noPrice = prices[1] ? (parseFloat(prices[1]) * 100).toFixed(0) : '--';
-
-      document.getElementById('tradeMarketImg').src = market.image || market.icon || '';
-      document.getElementById('tradeMarketQuestion').textContent = market.question;
-      document.getElementById('yesPrice').textContent = `${yesPrice}¢`;
-      document.getElementById('noPrice').textContent = `${noPrice}¢`;
-      document.getElementById('tradeAmount').value = '';
       
+      // Get all outcomes and prices
+      const outcomes = market.outcomes || ["Yes", "No"];
+      const prices = market.outcomePrices || [];
+      
+      // Set market image and question
+      const marketImg = document.getElementById('tradeMarketImg');
+      const imgUrl = market.image || market.icon || '';
+      if (imgUrl) {
+        marketImg.src = imgUrl;
+        marketImg.style.display = 'block';
+      } else {
+        marketImg.style.display = 'none';
+      }
+      document.getElementById('tradeMarketQuestion').textContent = market.question;
+      
+      // Render all outcomes with percentages
+      const outcomesContainer = document.getElementById('tradeOutcomes');
+      outcomesContainer.innerHTML = outcomes.map((outcome, index) => {
+        const price = prices[index] ? parseFloat(prices[index]) : 0;
+        const percent = (price * 100).toFixed(0);
+        const priceCents = (price * 100).toFixed(0);
+        const isActive = index === 0; // Default to first outcome
+        
+        return `
+          <div class="trade-outcome ${isActive ? 'active' : ''}" 
+               data-outcome-index="${index}" 
+               data-outcome="${outcome}">
+            <div class="trade-outcome-left">
+              <div class="trade-outcome-label">${outcome}</div>
+              <div class="trade-outcome-percent">${percent}%</div>
+            </div>
+            <div class="trade-outcome-price">${priceCents}¢</div>
+          </div>
+        `;
+      }).join('');
+      
+      // Set default selected outcome
+      if (outcomes.length > 0) {
+        state.tradeSide = outcomes[0];
+        state.selectedOutcomeIndex = 0;
+      }
+      
+      // Add click handlers for outcomes
+      outcomesContainer.querySelectorAll('.trade-outcome').forEach(outcomeEl => {
+        outcomeEl.addEventListener('click', () => {
+          // Remove active from all
+          outcomesContainer.querySelectorAll('.trade-outcome').forEach(o => o.classList.remove('active'));
+          // Add active to clicked
+          outcomeEl.classList.add('active');
+          
+          state.selectedOutcomeIndex = parseInt(outcomeEl.dataset.outcomeIndex);
+          state.tradeSide = outcomeEl.dataset.outcome;
+          
+          updateTradeSummary();
+        });
+      });
+      
+      document.getElementById('tradeAmount').value = '';
       updateTradeSummary();
       
       document.getElementById('tradeModal').classList.add('visible');
@@ -1363,8 +1412,11 @@
     function updateTradeSummary() {
       const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
       const prices = state.selectedMarket?.outcomePrices || [];
-      const priceIdx = state.tradeSide === 'yes' ? 0 : 1;
+      const priceIdx = state.selectedOutcomeIndex !== undefined 
+        ? state.selectedOutcomeIndex 
+        : (state.tradeSide === 'yes' ? 0 : 1);
       const price = prices[priceIdx] ? parseFloat(prices[priceIdx]) : 0.5;
+      const outcomeLabel = state.selectedMarket?.outcomes?.[priceIdx] || state.tradeSide || 'Yes';
       
       const shares = price > 0 ? (amount / price).toFixed(2) : 0;
       const potential = (shares * 1).toFixed(2);
@@ -1376,7 +1428,7 @@
       const btn = document.getElementById('tradeSubmit');
       if (state.wallet && amount > 0) {
         btn.disabled = false;
-        btn.textContent = `Buy ${state.tradeSide.toUpperCase()} · $${amount.toFixed(2)}`;
+        btn.textContent = `Buy ${outcomeLabel} · $${amount.toFixed(2)}`;
       } else if (!state.wallet) {
         btn.disabled = true;
         btn.textContent = 'Create Wallet First';
@@ -1429,16 +1481,6 @@
         if (e.target.id === 'tradeModal') closeTradeModal();
       });
 
-      // Trade side selection
-      document.querySelectorAll('.trade-side').forEach(side => {
-        side.addEventListener('click', () => {
-          document.querySelectorAll('.trade-side').forEach(s => s.classList.remove('active'));
-          side.classList.add('active');
-          state.tradeSide = side.dataset.side;
-          updateTradeSummary();
-        });
-      });
-
       // Amount input
       document.getElementById('tradeAmount').addEventListener('input', updateTradeSummary);
 
@@ -1455,35 +1497,6 @@
       initTradeModal();
       await initCategories();
 
-      // Deposit button - shows wallet addresses for funding
-      document.getElementById('depositBtn').addEventListener('click', async () => {
-        const wallet = getOrCreateWallet();
-        
-        // Copy polygon address to clipboard
-        try {
-          await navigator.clipboard.writeText(wallet.polygon);
-          document.getElementById('walletStatusBar').textContent = '✓ USDC address copied! Send USDC on Polygon.';
-        } catch (e) {
-          // Fallback - show in status
-          document.getElementById('walletStatusBar').textContent = 'Send USDC (Polygon) to: ' + wallet.polygon.substring(0, 20) + '...';
-        }
-      });
-
-      // Refresh button
-      document.getElementById('refreshButton').addEventListener('click', () => {
-        loadWallet();
-        fetchMarkets('trending');
-      });
-
-      // Withdraw button (placeholder)
-      document.getElementById('withdrawBtn').addEventListener('click', () => {
-        alert('Withdraw feature coming soon!');
-      });
-
-      // Trade button - scroll to markets
-      document.getElementById('tradeBtn').addEventListener('click', () => {
-        document.getElementById('marketsList').scrollIntoView({ behavior: 'smooth' });
-      });
 
       await loadWallet();
       // Markets will be fetched by initCategories()

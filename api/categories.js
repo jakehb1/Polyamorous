@@ -52,18 +52,37 @@ module.exports = async (req, res) => {
     };
 
     // Extract unique categories from tags
-    const categories = [];
+    const allCategories = [];
     const seenSlugs = new Set();
+    const MIN_VOLUME = 1000000; // $1M minimum
     
-    // Add predefined categories first
+    // First, build a map of tag slugs to tag IDs for lookup
+    const tagSlugToId = new Map();
+    for (const tag of tags) {
+      if (tag.id) {
+        const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+        if (slug) {
+          tagSlugToId.set(slug, tag.id);
+        }
+      }
+    }
+    
+    // Add predefined categories first, looking up tagId from API tags
     for (const [key, cat] of Object.entries(categoryMap)) {
-      categories.push({
+      // For sort modes, tagId stays null. For categories, look up the tagId
+      let tagId = null;
+      if (cat.isCategory && !cat.isSort) {
+        tagId = tagSlugToId.get(cat.slug) || null;
+      }
+      
+      allCategories.push({
         id: key,
         label: cat.label,
         icon: cat.icon,
         slug: cat.slug,
         isSort: cat.isSort || false,
         isCategory: cat.isCategory || false,
+        tagId: tagId,
       });
       seenSlugs.add(cat.slug);
     }
@@ -79,24 +98,68 @@ module.exports = async (req, res) => {
       // Only add if it looks like a main category (not too specific)
       const isMainCategory = !slug.includes("-") || slug.split("-").length <= 2;
       
-      if (isMainCategory && categories.length < 30) {
-        categories.push({
+      if (isMainCategory && allCategories.length < 30) {
+        allCategories.push({
           id: tag.id,
           label: label.charAt(0).toUpperCase() + label.slice(1),
           icon: "📌",
           slug: slug,
           isSort: false,
           isCategory: true,
+          tagId: tag.id,
         });
         seenSlugs.add(slug);
       }
     }
 
-    console.log("[categories] Returning", categories.length, "categories");
+    // Filter categories: check if they have markets with $1M+ volume
+    // Sort modes (trending, breaking, new) are always included
+    const categories = [];
+    
+    // Check each category in parallel
+    const categoryChecks = allCategories.map(async (cat) => {
+      // Sort modes are always included
+      if (cat.isSort) {
+        return { ...cat, hasVolume: true };
+      }
+      
+      // For categories, check if they have markets with $1M+ volume
+      if (!cat.tagId) {
+        return null; // Skip if no tag ID
+      }
+      
+      try {
+        const url = `${GAMMA_API}/markets?tag_id=${cat.tagId}&closed=false&active=true&limit=20`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data)) {
+            // Check if any market has $1M+ volume
+            const hasHighVolume = data.some(m => {
+              if (m.closed || m.active === false) return false;
+              const volume24hr = parseFloat(m.volume24hr) || 0;
+              const volume = parseFloat(m.volume) || 0;
+              const totalVolume = Math.max(volume24hr, volume);
+              return totalVolume >= MIN_VOLUME;
+            });
+            return hasHighVolume ? { ...cat, hasVolume: true } : null;
+          }
+        }
+      } catch (e) {
+        console.log(`[categories] Error checking volume for ${cat.slug}:`, e.message);
+      }
+      
+      return null; // Exclude if check failed or no high-volume markets
+    });
+    
+    const checkedCategories = await Promise.all(categoryChecks);
+    const filteredCategories = checkedCategories.filter(cat => cat !== null);
+    
+    console.log(`[categories] Filtered ${allCategories.length} categories to ${filteredCategories.length} with $1M+ volume markets`);
 
     return res.status(200).json({ 
-      categories: categories,
-      meta: { total: categories.length }
+      categories: filteredCategories,
+      meta: { total: filteredCategories.length }
     });
     
   } catch (err) {
