@@ -42,26 +42,26 @@ module.exports = async (req, res) => {
 
     // Map of known sports subcategories with icons
     const sportsMap = {
-      'nfl': { label: 'NFL', icon: '🏈' },
-      'nba': { label: 'NBA', icon: '🏀' },
-      'mlb': { label: 'MLB', icon: '⚾' },
-      'nhl': { label: 'NHL', icon: '🏒' },
-      'wnba': { label: 'WNBA', icon: '🏀' },
-      'ufc': { label: 'UFC', icon: '🥊' },
-      'soccer': { label: 'Soccer', icon: '⚽' },
-      'football': { label: 'Football', icon: '⚽' },
-      'basketball': { label: 'Basketball', icon: '🏀' },
-      'baseball': { label: 'Baseball', icon: '⚾' },
-      'hockey': { label: 'Hockey', icon: '🏒' },
-      'tennis': { label: 'Tennis', icon: '🎾' },
-      'cricket': { label: 'Cricket', icon: '🏏' },
-      'golf': { label: 'Golf', icon: '⛳' },
-      'boxing': { label: 'Boxing', icon: '🥊' },
-      'formula': { label: 'Formula 1', icon: '🏎️' },
-      'f1': { label: 'Formula 1', icon: '🏎️' },
-      'epl': { label: 'EPL', icon: '⚽' },
-      'cbb': { label: 'College Basketball', icon: '🏀' },
-      'cfb': { label: 'College Football', icon: '🏈' },
+      'nfl': { label: 'NFL', icon: '' },
+      'nba': { label: 'NBA', icon: '' },
+      'mlb': { label: 'MLB', icon: '' },
+      'nhl': { label: 'NHL', icon: '' },
+      'wnba': { label: 'WNBA', icon: '' },
+      'ufc': { label: 'UFC', icon: '' },
+      'soccer': { label: 'Soccer', icon: '' },
+      'football': { label: 'Football', icon: '' },
+      'basketball': { label: 'Basketball', icon: '' },
+      'baseball': { label: 'Baseball', icon: '' },
+      'hockey': { label: 'Hockey', icon: '' },
+      'tennis': { label: 'Tennis', icon: '' },
+      'cricket': { label: 'Cricket', icon: '' },
+      'golf': { label: 'Golf', icon: '' },
+      'boxing': { label: 'Boxing', icon: '' },
+      'formula': { label: 'Formula 1', icon: '' },
+      'f1': { label: 'Formula 1', icon: '' },
+      'epl': { label: 'EPL', icon: '' },
+      'cbb': { label: 'College Basketball', icon: '' },
+      'cfb': { label: 'College Football', icon: '' },
     };
 
     const subcategories = [];
@@ -82,7 +82,7 @@ module.exports = async (req, res) => {
       if (matchedKeyword && !seenSlugs.has(slug)) {
         const sportsInfo = sportsMap[matchedKeyword] || sportsMap[slug] || {
           label: label.charAt(0).toUpperCase() + label.slice(1),
-          icon: '⚽'
+          icon: ''
         };
         
         subcategories.push({

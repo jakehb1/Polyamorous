@@ -536,6 +536,17 @@
       transition: transform 0.2s;
     }
     .market-item:active { transform: scale(0.99); }
+    .market-image {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+    .market-image.hidden {
+      display: none;
+    }
     .market-info {
       flex: 1;
       min-width: 0;
@@ -805,15 +816,15 @@
       
       <div class="feature-list">
         <div class="feature-item">
-          <div class="feature-icon">⚡</div>
+          <div class="feature-icon"></div>
           <div class="feature-text">Instant trades on Polymarket via custodial wallet</div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon">📊</div>
+          <div class="feature-icon"></div>
           <div class="feature-text">Real-time markets, trending events, live odds</div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon">🔐</div>
+          <div class="feature-icon"></div>
           <div class="feature-text">Secure wallet with USDC on Polygon network</div>
         </div>
       </div>
@@ -1273,12 +1284,12 @@
           <button class="category-chip" 
                   data-sport-type="games" 
                   style="width: 100%; justify-content: flex-start; padding: 12px 16px;">
-            🎮 Games
+            Games
           </button>
           <button class="category-chip" 
                   data-sport-type="props" 
                   style="width: 100%; justify-content: flex-start; padding: 12px 16px;">
-            🎯 Props
+            Props
           </button>
         </div>
       `;
@@ -1314,7 +1325,7 @@
                           data-sport="${sub.slug}" 
                           data-sport-type="${type}"
                           style="width: 100%; justify-content: flex-start; padding: 12px 16px;">
-                    ${sub.icon} ${sub.label}
+                    ${sub.label}
                   </button>
                 `).join('')}
               </div>
@@ -1399,9 +1410,12 @@
         const prices = m.outcomePrices || [];
         const yesPrice = prices[0] ? (parseFloat(prices[0]) * 100).toFixed(0) : '--';
         const vol = m.volume24hr || m.volume || 0;
+        const imgUrl = m.image || m.eventImage || m.icon || '';
+        const hasImage = imgUrl && imgUrl.trim() !== '';
         
         return `
           <div class="market-item" data-id="${m.id}">
+            ${hasImage ? `<img class="market-image" src="${imgUrl}" alt="" onerror="this.classList.add('hidden')" />` : ''}
             <div class="market-info">
               <div class="market-question">${m.question}</div>
               <div class="market-meta">
@@ -1554,10 +1568,10 @@
       } else {
         // Fallback to default categories if API fails
         const fallbackCategories = [
-          { slug: 'trending', label: 'Trending', icon: '🔥' },
-          { slug: 'volume', label: 'Volume', icon: '📈' },
-          { slug: 'new', label: 'New', icon: '🆕' },
-          { slug: 'sports', label: 'Sports', icon: '⚽' },
+          { slug: 'trending', label: 'Trending', icon: '' },
+          { slug: 'volume', label: 'Volume', icon: '' },
+          { slug: 'new', label: 'New', icon: '' },
+          { slug: 'sports', label: 'Sports', icon: '' },
         ];
         renderCategories(fallbackCategories);
         state.selectedCategory = 'trending';

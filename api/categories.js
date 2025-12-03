@@ -35,20 +35,20 @@ module.exports = async (req, res) => {
     // Map Polymarket categories to our format
     // Common categories based on Polymarket's structure
     const categoryMap = {
-      "trending": { label: "Trending", icon: "🔥", slug: "trending", isSort: true },
-      "breaking": { label: "Breaking", icon: "⚡", slug: "breaking", isSort: true },
-      "new": { label: "New", icon: "🆕", slug: "new", isSort: true },
-      "politics": { label: "Politics", icon: "🏛️", slug: "politics", isCategory: true },
-      "sports": { label: "Sports", icon: "⚽", slug: "sports", isCategory: true },
-      "finance": { label: "Finance", icon: "💰", slug: "finance", isCategory: true },
-      "crypto": { label: "Crypto", icon: "₿", slug: "crypto", isCategory: true },
-      "geopolitics": { label: "Geopolitics", icon: "🌍", slug: "geopolitics", isCategory: true },
-      "earnings": { label: "Earnings", icon: "📊", slug: "earnings", isCategory: true },
-      "tech": { label: "Tech", icon: "💻", slug: "tech", isCategory: true },
-      "culture": { label: "Culture", icon: "🎭", slug: "culture", isCategory: true },
-      "world": { label: "World", icon: "🌎", slug: "world", isCategory: true },
-      "economy": { label: "Economy", icon: "📈", slug: "economy", isCategory: true },
-      "elections": { label: "Elections", icon: "🗳️", slug: "elections", isCategory: true },
+      "trending": { label: "Trending", icon: "", slug: "trending", isSort: true },
+      "breaking": { label: "Breaking", icon: "", slug: "breaking", isSort: true },
+      "new": { label: "New", icon: "", slug: "new", isSort: true },
+      "politics": { label: "Politics", icon: "", slug: "politics", isCategory: true },
+      "sports": { label: "Sports", icon: "", slug: "sports", isCategory: true },
+      "finance": { label: "Finance", icon: "", slug: "finance", isCategory: true },
+      "crypto": { label: "Crypto", icon: "", slug: "crypto", isCategory: true },
+      "geopolitics": { label: "Geopolitics", icon: "", slug: "geopolitics", isCategory: true },
+      "earnings": { label: "Earnings", icon: "", slug: "earnings", isCategory: true },
+      "tech": { label: "Tech", icon: "", slug: "tech", isCategory: true },
+      "culture": { label: "Culture", icon: "", slug: "culture", isCategory: true },
+      "world": { label: "World", icon: "", slug: "world", isCategory: true },
+      "economy": { label: "Economy", icon: "", slug: "economy", isCategory: true },
+      "elections": { label: "Elections", icon: "", slug: "elections", isCategory: true },
     };
 
     // Extract unique categories from tags
@@ -130,7 +130,7 @@ module.exports = async (req, res) => {
         categories.push({
           id: tag.id,
           label: label.charAt(0).toUpperCase() + label.slice(1),
-          icon: "📌",
+          icon: "",
           slug: slug,
           isSort: false,
           isCategory: true,

@@ -92,10 +92,76 @@ module.exports = async (req, res) => {
       }
       
     } else if (isSportsSubcategory) {
-      // Fetch markets for a specific sports subcategory (NFL, NBA, etc.)
-      console.log("[markets] Fetching markets for sports subcategory:", kind);
+      // Fetch game events for a specific sports subcategory (NFL, NBA, etc.)
+      console.log("[markets] Fetching game events for sports subcategory:", kind);
       
-      // Get tag ID for this sports subcategory
+      // Map sport slugs to common variations for better matching
+      const sportVariations = {
+        'nfl': ['nfl', 'american football', 'football'],
+        'nba': ['nba', 'basketball'],
+        'mlb': ['mlb', 'baseball'],
+        'nhl': ['nhl', 'hockey'],
+        'cfb': ['cfb', 'college football', 'ncaaf'],
+        'cbb': ['cbb', 'college basketball', 'ncaab'],
+        'epl': ['epl', 'premier league', 'english premier league'],
+      };
+      
+      const searchTerms = sportVariations[kind.toLowerCase()] || [kind.toLowerCase()];
+      
+      // Strategy 1: Fetch events directly (this gives us game structure)
+      try {
+        const eventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=200`;
+        const eventsResp = await fetch(eventsUrl);
+        if (eventsResp.ok) {
+          const events = await eventsResp.json();
+          if (Array.isArray(events)) {
+            console.log("[markets] Fetched", events.length, "total events");
+            
+            // Filter events by sport keyword
+            for (const event of events) {
+              const eventSlug = (event.slug || "").toLowerCase();
+              const eventTitle = (event.title || "").toLowerCase();
+              const eventTicker = (event.ticker || "").toLowerCase();
+              
+              // Check if event matches any of our search terms
+              const matches = searchTerms.some(term => 
+                eventSlug.includes(term) || 
+                eventTitle.includes(term) ||
+                eventTicker.includes(term)
+              );
+              
+              if (matches && event.markets && Array.isArray(event.markets)) {
+                // Extract all markets from this event (game)
+                for (const market of event.markets) {
+                  if (!market.closed && market.active !== false) {
+                    // Avoid duplicates
+                    const existing = markets.find(m => m.id === market.id);
+                    if (!existing) {
+                      markets.push({
+                        ...market,
+                        eventId: event.id,
+                        eventTitle: event.title,
+                        eventSlug: event.slug,
+                        eventTicker: event.ticker,
+                        eventStartDate: event.startDate,
+                        eventEndDate: event.endDate,
+                        eventImage: event.image || event.icon,
+                        eventVolume: event.volume,
+                        eventLiquidity: event.liquidity,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+            console.log("[markets] Found", markets.length, "markets from events");
+          }
+        }
+      } catch (e) {
+        console.log("[markets] Error fetching events:", e.message);
+      }
+      
+      // Strategy 2: Get tag ID and fetch events by tag
       let categoryTagId = null;
       try {
         const tagsResp = await fetch(`${GAMMA_API}/tags`);
@@ -105,31 +171,76 @@ module.exports = async (req, res) => {
             // Find tag matching the sports subcategory
             const categoryTag = tags.find(tag => {
               const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
-              return slug === kind.toLowerCase() || slug.includes(kind.toLowerCase());
+              return searchTerms.some(term => slug === term || slug.includes(term));
             });
             if (categoryTag && categoryTag.id) {
               categoryTagId = categoryTag.id;
               console.log("[markets] Found tag ID for sports subcategory:", categoryTagId);
+              
+              // Fetch events with this tag
+              try {
+                const eventsUrl = `${GAMMA_API}/events?tag_id=${categoryTagId}&closed=false&active=true&limit=100`;
+                const eventsResp = await fetch(eventsUrl);
+                if (eventsResp.ok) {
+                  const events = await eventsResp.json();
+                  if (Array.isArray(events)) {
+                    for (const event of events) {
+                      if (event.markets && Array.isArray(event.markets)) {
+                        for (const market of event.markets) {
+                          if (!market.closed && market.active !== false) {
+                            const existing = markets.find(m => m.id === market.id);
+                            if (!existing) {
+                              markets.push({
+                                ...market,
+                                eventId: event.id,
+                                eventTitle: event.title,
+                                eventSlug: event.slug,
+                                eventTicker: event.ticker,
+                                eventStartDate: event.startDate,
+                                eventEndDate: event.endDate,
+                                eventImage: event.image || event.icon,
+                                eventVolume: event.volume,
+                                eventLiquidity: event.liquidity,
+                              });
+                            }
+                          }
+                        }
+                      }
+                    }
+                    console.log("[markets] Found", events.length, "events with tag, total markets:", markets.length);
+                  }
+                }
+              } catch (e) {
+                console.log("[markets] Error fetching events by tag:", e.message);
+              }
             }
           }
         }
       } catch (e) {
-        console.log("[markets] Error fetching tags for sports subcategory:", e.message);
+        console.log("[markets] Error fetching tags:", e.message);
       }
       
-      // Fetch markets for this sports subcategory
-      if (categoryTagId) {
+      // Strategy 3: Fallback - fetch markets directly by tag
+      if (markets.length < 10 && categoryTagId) {
         try {
           const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&active=true&limit=100`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
             if (Array.isArray(data)) {
-              markets = data.filter(m => !m.closed && m.active !== false);
+              const newMarkets = data.filter(m => !m.closed && m.active !== false);
+              // Avoid duplicates
+              for (const market of newMarkets) {
+                const existing = markets.find(m => m.id === market.id);
+                if (!existing) {
+                  markets.push(market);
+                }
+              }
+              console.log("[markets] Added", newMarkets.length, "markets from direct fetch");
             }
           }
         } catch (e) {
-          console.log("[markets] Error fetching sports subcategory markets:", e.message);
+          console.log("[markets] Error fetching markets directly:", e.message);
         }
       }
       
@@ -394,13 +505,23 @@ module.exports = async (req, res) => {
         conditionId: m.conditionId,
         question: m.question || m.eventTitle || "Unknown Market",
         slug: m.slug,
-        image: m.image || m.icon,
+        image: m.image || m.icon || m.eventImage,
         volume: parseFloat(m.volume) || 0,
         volume24hr: parseFloat(m.volume24hr) || 0,
         liquidity: parseFloat(m.liquidity) || 0,
         outcomes: outcomes,
         outcomePrices: outcomePrices,
         clobTokenIds: m.clobTokenIds || [],
+        // Event/game information for sports markets
+        eventId: m.eventId,
+        eventTitle: m.eventTitle,
+        eventSlug: m.eventSlug,
+        eventTicker: m.eventTicker,
+        eventStartDate: m.eventStartDate,
+        eventEndDate: m.eventEndDate,
+        eventImage: m.eventImage,
+        eventVolume: m.eventVolume ? parseFloat(m.eventVolume) : 0,
+        eventLiquidity: m.eventLiquidity ? parseFloat(m.eventLiquidity) : 0,
       };
     });
 
