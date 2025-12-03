@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Polygram</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg: #e8f4f2;
+      --bg-card: #ffffff;
+      --bg-secondary: #d4ebe7;
+      --accent: #3ECFB2;
+      --primary: #1a2b4b;
+      --text: #1a2b4b;
+      --text-secondary: #5a6a7e;
+      --text-dim: #8b9ab5;
+      --border: #c5ddd8;
+      --yes-green: #22c55e;
+      --yes-bg: rgba(34, 197, 94, 0.12);
+      --no-red: #ef4444;
+      --no-bg: rgba(239, 68, 68, 0.12);
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px 12px;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .logo-icon {
+      font-size: 24px;
+      color: var(--accent);
+    }
+
+    .balance-pill {
+      background: var(--bg-card);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+
+    .category-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 0 16px 16px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .category-tabs::-webkit-scrollbar { display: none; }
+
+    .category-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      white-space: nowrap;
+      border-radius: 20px;
+      transition: all 0.2s;
+    }
+
+    .category-tab svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.7;
+    }
+
+    .category-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .category-tab.active svg {
+      opacity: 1;
+    }
+
+    .events-container {
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .event-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .event-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.45;
+      margin-bottom: 14px;
+      color: var(--text);
+    }
+
+    .outcome-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+
+    .outcome-name {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .outcome-percent {
+      font-size: 15px;
+      font-weight: 700;
+      margin-right: 12px;
+      min-width: 44px;
+      text-align: right;
+    }
+
+    .outcome-buttons { display: flex; gap: 8px; }
+
+    .outcome-btn {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .outcome-btn.yes {
+      background: var(--yes-bg);
+      color: var(--yes-green);
+    }
+
+    .outcome-btn.yes:active {
+      background: var(--yes-green);
+      color: white;
+    }
+
+    .outcome-btn.no {
+      background: var(--no-bg);
+      color: var(--no-red);
+    }
+
+    .outcome-btn.no:active {
+      background: var(--no-red);
+      color: white;
+    }
+
+    .event-footer {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .event-volume {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .volume-icon {
+      width: 14px;
+      height: 14px;
+      color: var(--text-dim);
+    }
+
+    .portfolio-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 20px;
+      margin: 0 16px 16px;
+      border: 1px solid var(--border);
+    }
+
+    .portfolio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .portfolio-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .portfolio-value {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .portfolio-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .portfolio-row {
+      background: var(--bg);
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .positions-section {
+      margin: 0 16px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .positions-tabs {
+      display: flex;
+      gap: 24px;
+      padding: 16px 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .position-tab {
+      padding-bottom: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .position-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-around;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 8px 0;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      z-index: 1000;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 24px;
+    }
+
+    .nav-item.active { color: var(--accent); }
+    .nav-icon { width: 22px; height: 22px; }
+
+    .more-menu {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      z-index: 2000;
+      padding: 20px;
+    }
+    .more-menu.visible { display: block; }
+
+    .more-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .wallet-address {
+      font-size: 15px;
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+
+    .close-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .menu-item {
+      padding: 16px 0;
+      font-size: 16px;
+      font-weight: 500;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 3000;
+      align-items: flex-end;
+    }
+    .modal-overlay.visible { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 20px 20px 0 0;
+      padding: 24px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+
+    .trade-sides {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .trade-side {
+      padding: 16px;
+      border-radius: 14px;
+      border: 2px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .trade-side.yes.active { border-color: var(--yes-green); background: var(--yes-bg); }
+    .trade-side.no.active { border-color: var(--no-red); background: var(--no-bg); }
+
+    .trade-side-label { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .trade-side.yes .trade-side-label { color: var(--yes-green); }
+    .trade-side.no .trade-side-label { color: var(--no-red); }
+
+    .trade-side-price { font-size: 24px; font-weight: 800; }
+    .trade-side.yes .trade-side-price { color: var(--yes-green); }
+    .trade-side.no .trade-side-price { color: var(--no-red); }
+
+    .amount-section { margin-bottom: 20px; }
+    .amount-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; }
+
+    .amount-input {
+      width: 100%;
+      padding: 14px;
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      outline: none;
+    }
+    .amount-input:focus { border-color: var(--accent); }
+
+    .trade-summary {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 20px;
+    }
+
+    .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+    .summary-label { color: var(--text-secondary); }
+    .summary-value { font-weight: 600; }
+
+    .trade-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+    }
+    .trade-btn:disabled { background: var(--border); color: var(--text-dim); }
+
+    .loading { text-align: center; padding: 40px; color: var(--text-dim); font-size: 14px; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .splash {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 9999;
+      transition: opacity 0.3s;
+    }
+    .splash.hidden { opacity: 0; pointer-events: none; }
+    .splash-icon { font-size: 48px; color: var(--accent); }
+    .splash-text { font-size: 24px; font-weight: 700; color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="splash" id="splash">
+    <div class="splash-icon">◉̸</div>
+    <div class="splash-text">Polygram</div>
+  </div>
+
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">◉̸</span>
+      <span>Polygram</span>
+    </div>
+    <div class="balance-pill">$0.00</div>
+  </header>
+
+  <div class="category-tabs">
+    <button class="category-tab active" data-category="trending">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      Trending
+    </button>
+    <button class="category-tab" data-category="new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      New
+    </button>
+    <button class="category-tab" data-category="politics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>
+      </svg>
+      Politics
+    </button>
+    <button class="category-tab" data-category="sports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        <path d="M2 12h20"/>
+      </svg>
+      Sports
+    </button>
+    <button class="category-tab" data-category="crypto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727"/>
+      </svg>
+      Crypto
+    </button>
+  </div>
+
+  <div class="view active" id="homeView">
+    <div class="events-container" id="eventsContainer">
+      <div class="loading">Loading markets...</div>
+    </div>
+  </div>
+
+  <div class="view" id="portfolioView">
+    <div class="portfolio-card">
+      <div class="portfolio-header">
+        <div class="portfolio-label">Portfolio Value</div>
+      </div>
+      <div class="portfolio-value">$0.00</div>
+      <div class="portfolio-subtitle">Today</div>
+      <div class="portfolio-row">USDC: $0.00 · Positions: $0.00</div>
+    </div>
+
+    <div class="positions-section">
+      <div class="positions-tabs">
+        <button class="position-tab active">Positions</button>
+        <button class="position-tab">Orders</button>
+        <button class="position-tab">History</button>
+      </div>
+      <div class="empty-state">No positions yet</div>
+    </div>
+  </div>
+
+  <div class="more-menu" id="moreMenu">
+    <div class="more-header">
+      <div class="wallet-address" id="walletAddressDisplay">0x0000...0000</div>
+      <button class="close-btn" id="closeMoreBtn">×</button>
+    </div>
+    <button class="menu-item" id="addFundsBtn">Add Funds</button>
+    <button class="menu-item" id="copyAddressBtn">Copy Wallet Address</button>
+    <button class="menu-item">Leaderboard</button>
+    <button class="menu-item">Activity</button>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="navHome">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Home
+    </button>
+    <button class="nav-item" id="navPortfolio">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+      </svg>
+      Portfolio
+    </button>
+    <button class="nav-item" id="navMore">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+      </svg>
+      More
+    </button>
+  </nav>
+
+  <div class="modal-overlay" id="tradeModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h3 class="modal-title" id="modalMarket">Select your position</h3>
+      
+      <div class="trade-sides">
+        <div class="trade-side yes active" data-side="yes">
+          <div class="trade-side-label">Yes</div>
+          <div class="trade-side-price" id="yesPrice">--¢</div>
+        </div>
+        <div class="trade-side no" data-side="no">
+          <div class="trade-side-label">No</div>
+          <div class="trade-side-price" id="noPrice">--¢</div>
+        </div>
+      </div>
+
+      <div class="amount-section">
+        <div class="amount-label">Amount (USDC)</div>
+        <input type="number" class="amount-input" id="tradeAmount" placeholder="0.00" />
+      </div>
+
+      <div class="trade-summary">
+        <div class="summary-row"><span class="summary-label">Shares</span><span class="summary-value" id="tradeShares">0.00</span></div>
+        <div class="summary-row"><span class="summary-label">Avg Price</span><span class="summary-value" id="tradeAvgPrice">--¢</span></div>
+        <div class="summary-row"><span class="summary-label">Potential Return</span><span class="summary-value" id="tradePotential">$0.00</span></div>
+      </div>
+
+      <button class="trade-btn" id="tradeSubmit" disabled>Enter Amount</button>
+    </div>
+  </div>
+
+  <script>
+    const state = { wallet: null, markets: [], selectedMarket: null, tradeSide: 'yes' };
+    const WALLET_KEY = 'polygram_wallet';
+
+    function getOrCreateWallet() {
+      const stored = localStorage.getItem(WALLET_KEY);
+      if (stored) try { const w = JSON.parse(stored); if (w.polygon) return w; } catch {}
+      const w = ethers.Wallet.createRandom();
+      const wallet = { polygon: w.address, pk: w.privateKey };
+      localStorage.setItem(WALLET_KEY, JSON.stringify(wallet));
+      return wallet;
+    }
+
+    function shortAddr(a) { return a ? `${a.slice(0,6)}...${a.slice(-4)}` : '0x0000...0000'; }
+
+    async function fetchMarkets(category = 'trending') {
+      const container = document.getElementById('eventsContainer');
+      container.innerHTML = '<div class="loading">Loading markets...</div>';
+      try {
+        const resp = await fetch(`/api/markets?category=${category}&limit=20`);
+        const data = await resp.json();
+        if (data.markets?.length) { 
+          state.markets = data.markets; 
+          renderMarkets(data.markets); 
+        } else {
+          container.innerHTML = '<div class="loading">No markets found</div>';
+        }
+      } catch (e) { 
+        console.error(e);
+        container.innerHTML = '<div class="loading">Error loading markets</div>'; 
+      }
+    }
+
+    function renderMarkets(markets) {
+      document.getElementById('eventsContainer').innerHTML = markets.map(m => {
+        const prices = m.outcomePrices || [];
+        const yesPrice = prices[0] ? Math.round(parseFloat(prices[0]) * 100) : '--';
+        const vol = m.volume >= 1e6 ? `$${(m.volume/1e6).toFixed(1)}m` : m.volume >= 1e3 ? `$${(m.volume/1e3).toFixed(0)}k` : `$${Math.round(m.volume)||0}`;
+        return `
+          <div class="event-card">
+            <div class="event-title">${m.question}</div>
+            <div class="outcome-row">
+              <div class="outcome-name">Yes</div>
+              <div class="outcome-percent">${yesPrice}%</div>
+              <div class="outcome-buttons">
+                <button class="outcome-btn yes" data-id="${m.id}" data-side="yes">Yes</button>
+                <button class="outcome-btn no" data-id="${m.id}" data-side="no">No</button>
+              </div>
+            </div>
+            <div class="event-footer">
+              <svg class="volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <div class="event-volume">${vol} Vol</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.outcome-btn').forEach(btn => btn.onclick = e => {
+        e.stopPropagation();
+        const m = state.markets.find(x => x.id === btn.dataset.id);
+        if (m) openTradeModal(m, btn.dataset.side);
+      });
+    }
+
+    function openTradeModal(market, side = 'yes') {
+      state.selectedMarket = market;
+      state.tradeSide = side;
+      const prices = market.outcomePrices || [];
+      document.getElementById('modalMarket').textContent = market.question;
+      document.getElementById('yesPrice').textContent = `${Math.round((prices[0]||0.5)*100)}¢`;
+      document.getElementById('noPrice').textContent = `${Math.round((prices[1]||0.5)*100)}¢`;
+      document.getElementById('tradeAmount').value = '';
+      document.querySelectorAll('.trade-side').forEach(el => el.classList.toggle('active', el.dataset.side === side));
+      updateTradeSummary();
+      document.getElementById('tradeModal').classList.add('visible');
+    }
+
+    function updateTradeSummary() {
+      const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
+      const prices = state.selectedMarket?.outcomePrices || [];
+      const price = parseFloat(prices[state.tradeSide === 'yes' ? 0 : 1]) || 0.5;
+      const shares = price > 0 ? (amount / price).toFixed(2) : 0;
+      document.getElementById('tradeShares').textContent = shares;
+      document.getElementById('tradeAvgPrice').textContent = `${Math.round(price*100)}¢`;
+      document.getElementById('tradePotential').textContent = `$${(shares*1).toFixed(2)}`;
+      const btn = document.getElementById('tradeSubmit');
+      btn.disabled = amount <= 0;
+      btn.textContent = amount > 0 ? `Buy ${state.tradeSide.toUpperCase()} · $${amount.toFixed(2)}` : 'Enter Amount';
+    }
+
+    function switchView(view) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(view === 'home' ? 'homeView' : 'portfolioView').classList.add('active');
+      document.getElementById(view === 'home' ? 'navHome' : 'navPortfolio').classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+      state.wallet = getOrCreateWallet();
+      document.getElementById('walletAddressDisplay').textContent = shortAddr(state.wallet.polygon);
+
+      document.querySelectorAll('.category-tab').forEach(tab => tab.onclick = () => {
+        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        fetchMarkets(tab.dataset.category);
+      });
+
+      document.getElementById('navHome').onclick = () => switchView('home');
+      document.getElementById('navPortfolio').onclick = () => switchView('portfolio');
+      document.getElementById('navMore').onclick = () => document.getElementById('moreMenu').classList.add('visible');
+      document.getElementById('closeMoreBtn').onclick = () => document.getElementById('moreMenu').classList.remove('visible');
+      document.getElementById('copyAddressBtn').onclick = async () => { await navigator.clipboard.writeText(state.wallet.polygon); alert('Copied!'); };
+      document.getElementById('addFundsBtn').onclick = async () => { await navigator.clipboard.writeText(state.wallet.polygon); alert(`Send USDC (Polygon) to:\n${state.wallet.polygon}`); };
+
+      document.getElementById('tradeModal').onclick = e => { if (e.target.id === 'tradeModal') document.getElementById('tradeModal').classList.remove('visible'); };
+      document.querySelectorAll('.trade-side').forEach(s => s.onclick = () => {
+        document.querySelectorAll('.trade-side').forEach(x => x.classList.remove('active'));
+        s.classList.add('active');
+        state.tradeSide = s.dataset.side;
+        updateTradeSummary();
+      });
+      document.getElementById('tradeAmount').oninput = updateTradeSummary;
+      document.getElementById('tradeSubmit').onclick = () => alert('Trading coming soon!');
+
+      await fetchMarkets('trending');
+      setTimeout(() => document.getElementById('splash').classList.add('hidden'), 500);
+    });
+  </script>
+</body>
+</html>
