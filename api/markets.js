@@ -10,13 +10,14 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
 
-  const { kind = "trending", limit = "1000" } = req.query;
+  const { kind = "trending", limit = "1000", sportType = null } = req.query;
   // Allow much higher limits to get all markets (default 1000, max 10000)
   const limitNum = Math.min(Math.max(Number(limit) || 1000, 1), 10000);
   // Parse minVolume - default to 0 to get ALL markets (no volume filter by default)
   const minVolumeProvided = req.query.minVolume !== undefined && req.query.minVolume !== null;
   const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0;
   const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0 : minVolumeParsed, 0);
+  // sportType: "games" or "props" - used to filter sports markets
 
   const GAMMA_API = "https://gamma-api.polymarket.com";
   
@@ -106,7 +107,8 @@ module.exports = async (req, res) => {
       
     } else if (isSportsSubcategory) {
       // Fetch game events for a specific sports subcategory (NFL, NBA, etc.)
-      console.log("[markets] Fetching game events for sports subcategory:", kind);
+      const isGamesOnly = sportType === "games";
+      console.log("[markets] Fetching for sports subcategory:", kind, "sportType:", sportType, "gamesOnly:", isGamesOnly);
       
       // Map sport slugs to common variations for better matching
       const sportVariations = {
@@ -234,7 +236,9 @@ module.exports = async (req, res) => {
       }
       
       // Strategy 3: Fallback - fetch markets directly by tag
-      if (markets.length < 10 && categoryTagId) {
+      // ONLY do this if we're NOT filtering for games only (props or all markets)
+      // For "games", we only want markets from events (actual live games), not props/futures
+      if (!isGamesOnly && markets.length < 10 && categoryTagId) {
         try {
           const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&active=true&limit=1000`;
           const resp = await fetch(url);
@@ -255,6 +259,8 @@ module.exports = async (req, res) => {
         } catch (e) {
           console.log("[markets] Error fetching markets directly:", e.message);
         }
+      } else if (isGamesOnly && markets.length === 0) {
+        console.log("[markets] No game events found for", kind, "- this is expected if no live games are available");
       }
       
     } else if (kind === "sports") {
@@ -447,6 +453,18 @@ module.exports = async (req, res) => {
     });
     
     console.log("[markets] Total unique markets found:", markets.length);
+
+    // Filter: If sportType is "games", only include markets that are part of events (actual games)
+    // Exclude props, futures, and other non-game markets
+    if (sportType === "games" && isSportsSubcategory) {
+      const beforeFilter = markets.length;
+      markets = markets.filter(m => {
+        // Only include markets that have eventId (part of an actual game event)
+        // or have event-related fields indicating they're game markets
+        return m.eventId || m.eventTitle || m.eventSlug || m.eventTicker;
+      });
+      console.log("[markets] After games-only filter:", markets.length, "(removed", beforeFilter - markets.length, "non-game markets)");
+    }
 
     // Filter: must have valid prices
     markets = markets.filter(m => {

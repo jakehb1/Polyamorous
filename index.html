@@ -1338,8 +1338,8 @@
                 const sportType = btn.dataset.sportType;
                 state.selectedCategory = sportSlug;
                 state.selectedSportType = sportType;
-                // Fetch markets for this sport (type is stored in state for potential filtering)
-                fetchMarkets(sportSlug);
+                // Fetch markets for this sport, passing sportType to filter games vs props
+                fetchMarkets(sportSlug, sportType);
               });
             });
           } else {
@@ -1360,13 +1360,16 @@
     // =====================
     // MARKETS
     // =====================
-    async function fetchMarkets(kind = 'trending') {
+    async function fetchMarkets(kind = 'trending', sportType = null) {
       const list = document.getElementById('marketsList');
       list.innerHTML = '<div class="loading">Loading markets...</div>';
 
       try {
-        console.log('[fetchMarkets] Fetching:', kind);
-        const apiUrl = `/api/markets?kind=${kind}&limit=10000&minVolume=0`;
+        console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType);
+        let apiUrl = `/api/markets?kind=${kind}&limit=10000&minVolume=0`;
+        if (sportType) {
+          apiUrl += `&sportType=${sportType}`;
+        }
         console.log('[fetchMarkets] URL:', apiUrl);
         
         const resp = await fetch(apiUrl);
