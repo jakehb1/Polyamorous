@@ -27,7 +27,13 @@ module.exports = async (req, res) => {
     const sortModes = ["trending", "volume", "new", "breaking"];
     const isCategory = !sortModes.includes(kind);
     
-    if (isCategory && kind !== "sports") {
+    // Check if this is a sports subcategory (like nfl, nba, etc.)
+    const sportsSubcategories = ["nfl", "nba", "mlb", "nhl", "wnba", "ufc", "soccer", "football", 
+                                 "basketball", "baseball", "hockey", "tennis", "cricket", "golf", 
+                                 "boxing", "formula", "f1", "epl", "cbb", "cfb"];
+    const isSportsSubcategory = sportsSubcategories.includes(kind.toLowerCase());
+    
+    if (isCategory && kind !== "sports" && !isSportsSubcategory) {
       // Fetch markets for a specific category
       console.log("[markets] Fetching markets for category:", kind);
       
@@ -82,6 +88,48 @@ module.exports = async (req, res) => {
           }
         } catch (e) {
           console.log("[markets] Error fetching general markets:", e.message);
+        }
+      }
+      
+    } else if (isSportsSubcategory) {
+      // Fetch markets for a specific sports subcategory (NFL, NBA, etc.)
+      console.log("[markets] Fetching markets for sports subcategory:", kind);
+      
+      // Get tag ID for this sports subcategory
+      let categoryTagId = null;
+      try {
+        const tagsResp = await fetch(`${GAMMA_API}/tags`);
+        if (tagsResp.ok) {
+          const tags = await tagsResp.json();
+          if (Array.isArray(tags)) {
+            // Find tag matching the sports subcategory
+            const categoryTag = tags.find(tag => {
+              const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+              return slug === kind.toLowerCase() || slug.includes(kind.toLowerCase());
+            });
+            if (categoryTag && categoryTag.id) {
+              categoryTagId = categoryTag.id;
+              console.log("[markets] Found tag ID for sports subcategory:", categoryTagId);
+            }
+          }
+        }
+      } catch (e) {
+        console.log("[markets] Error fetching tags for sports subcategory:", e.message);
+      }
+      
+      // Fetch markets for this sports subcategory
+      if (categoryTagId) {
+        try {
+          const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&active=true&limit=100`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data)) {
+              markets = data.filter(m => !m.closed && m.active !== false);
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error fetching sports subcategory markets:", e.message);
         }
       }
       

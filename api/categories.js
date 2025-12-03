@@ -52,9 +52,20 @@ module.exports = async (req, res) => {
     };
 
     // Extract unique categories from tags
-    const allCategories = [];
+    const categories = [];
     const seenSlugs = new Set();
-    const MIN_VOLUME = 1000000; // $1M minimum
+    
+    // List of country names and other non-category terms to exclude
+    const excludeTerms = new Set([
+      'saudi arabia', 'united states', 'russia', 'china', 'india', 'brazil', 'japan',
+      'germany', 'france', 'uk', 'united kingdom', 'canada', 'australia', 'south korea',
+      'italy', 'spain', 'mexico', 'indonesia', 'netherlands', 'turkey', 'switzerland',
+      'poland', 'belgium', 'sweden', 'norway', 'denmark', 'finland', 'ireland',
+      'portugal', 'greece', 'czech republic', 'romania', 'hungary', 'ukraine',
+      'israel', 'egypt', 'south africa', 'argentina', 'chile', 'colombia', 'peru',
+      'philippines', 'vietnam', 'thailand', 'malaysia', 'singapore', 'new zealand',
+      'saudi', 'arabia', 'arab', 'emirates', 'qatar', 'kuwait', 'bahrain', 'oman'
+    ]);
     
     // First, build a map of tag slugs to tag IDs for lookup
     const tagSlugToId = new Map();
@@ -68,6 +79,8 @@ module.exports = async (req, res) => {
     }
     
     // Add predefined categories first, looking up tagId from API tags
+    // NOTE: Predefined categories are ALWAYS included, even if tagId lookup fails (tagId will be null)
+    // This ensures categories like "politics", "sports", "finance" are always available
     for (const [key, cat] of Object.entries(categoryMap)) {
       // For sort modes, tagId stays null. For categories, look up the tagId
       let tagId = null;
@@ -75,19 +88,21 @@ module.exports = async (req, res) => {
         tagId = tagSlugToId.get(cat.slug) || null;
       }
       
-      allCategories.push({
+      // Always add predefined categories regardless of tagId value
+      categories.push({
         id: key,
         label: cat.label,
         icon: cat.icon,
         slug: cat.slug,
         isSort: cat.isSort || false,
         isCategory: cat.isCategory || false,
-        tagId: tagId,
+        tagId: tagId, // May be null if lookup fails, but category is still included
       });
       seenSlugs.add(cat.slug);
     }
 
     // Add additional categories from tags that aren't already included
+    // Only add well-known category types, exclude countries and specific entities
     for (const tag of tags) {
       const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
       const label = tag.label || tag.name || slug;
@@ -95,11 +110,24 @@ module.exports = async (req, res) => {
       // Skip if we already have this category or if it's too generic
       if (seenSlugs.has(slug) || !tag.id) continue;
       
+      // Exclude country names and other non-category terms
+      if (excludeTerms.has(slug)) continue;
+      
+      // Exclude if it contains country-like patterns (multiple words, proper nouns)
+      const words = slug.split(/\s+/);
+      if (words.length > 2) continue; // Too specific
+      
       // Only add if it looks like a main category (not too specific)
       const isMainCategory = !slug.includes("-") || slug.split("-").length <= 2;
       
-      if (isMainCategory && allCategories.length < 30) {
-        allCategories.push({
+      // Additional check: exclude if it looks like a person name or specific entity
+      const isProperNoun = /^[A-Z]/.test(label) && words.length === 1;
+      if (isProperNoun && !['nfl', 'nba', 'mlb', 'nhl', 'ufc', 'wnba', 'cbb', 'cfb'].includes(slug)) {
+        continue;
+      }
+      
+      if (isMainCategory && categories.length < 25) {
+        categories.push({
           id: tag.id,
           label: label.charAt(0).toUpperCase() + label.slice(1),
           icon: "📌",
@@ -112,54 +140,11 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Filter categories: check if they have markets with $1M+ volume
-    // Sort modes (trending, breaking, new) are always included
-    const categories = [];
-    
-    // Check each category in parallel
-    const categoryChecks = allCategories.map(async (cat) => {
-      // Sort modes are always included
-      if (cat.isSort) {
-        return { ...cat, hasVolume: true };
-      }
-      
-      // For categories, check if they have markets with $1M+ volume
-      if (!cat.tagId) {
-        return null; // Skip if no tag ID
-      }
-      
-      try {
-        const url = `${GAMMA_API}/markets?tag_id=${cat.tagId}&closed=false&active=true&limit=20`;
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const data = await resp.json();
-          if (Array.isArray(data)) {
-            // Check if any market has $1M+ volume
-            const hasHighVolume = data.some(m => {
-              if (m.closed || m.active === false) return false;
-              const volume24hr = parseFloat(m.volume24hr) || 0;
-              const volume = parseFloat(m.volume) || 0;
-              const totalVolume = Math.max(volume24hr, volume);
-              return totalVolume >= MIN_VOLUME;
-            });
-            return hasHighVolume ? { ...cat, hasVolume: true } : null;
-          }
-        }
-      } catch (e) {
-        console.log(`[categories] Error checking volume for ${cat.slug}:`, e.message);
-      }
-      
-      return null; // Exclude if check failed or no high-volume markets
-    });
-    
-    const checkedCategories = await Promise.all(categoryChecks);
-    const filteredCategories = checkedCategories.filter(cat => cat !== null);
-    
-    console.log(`[categories] Filtered ${allCategories.length} categories to ${filteredCategories.length} with $1M+ volume markets`);
+    console.log(`[categories] Returning ${categories.length} categories`);
 
     return res.status(200).json({ 
-      categories: filteredCategories,
-      meta: { total: filteredCategories.length }
+      categories: categories,
+      meta: { total: categories.length }
     });
     
   } catch (err) {

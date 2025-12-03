@@ -1250,10 +1250,63 @@
           // Scroll to active chip (center it if possible)
           chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
           
-          // Fetch markets for this category
-          fetchMarkets(kind);
+          // If sports is clicked, show subcategories instead of markets
+          if (kind === 'sports') {
+            showSportsSubcategories();
+          } else {
+            // Fetch markets for this category
+            fetchMarkets(kind);
+          }
         });
       });
+    }
+
+    async function showSportsSubcategories() {
+      try {
+        const resp = await fetch('/api/sports-subcategories');
+        if (resp.ok) {
+          const data = await resp.json();
+          const subcategories = data.subcategories || [];
+          
+          if (subcategories.length > 0) {
+            // Render subcategories in the markets list area
+            const list = document.getElementById('marketsList');
+            list.innerHTML = `
+              <div style="margin-bottom: 16px; font-size: 14px; color: var(--text-muted);">
+                Select a sport:
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                ${subcategories.map(sub => `
+                  <button class="category-chip" 
+                          data-sport="${sub.slug}" 
+                          style="width: 100%; justify-content: flex-start; padding: 12px 16px;">
+                    ${sub.icon} ${sub.label}
+                  </button>
+                `).join('')}
+              </div>
+            `;
+            
+            // Add click handlers for subcategories
+            list.querySelectorAll('.category-chip').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const sportSlug = btn.dataset.sport;
+                state.selectedCategory = sportSlug;
+                fetchMarkets(sportSlug);
+              });
+            });
+          } else {
+            // Fallback: fetch sports markets directly
+            fetchMarkets('sports');
+          }
+        } else {
+          // Fallback: fetch sports markets directly
+          fetchMarkets('sports');
+        }
+      } catch (err) {
+        console.error('[showSportsSubcategories] Error:', err);
+        // Fallback: fetch sports markets directly
+        fetchMarkets('sports');
+      }
     }
 
     // =====================
