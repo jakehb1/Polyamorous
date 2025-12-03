@@ -10,25 +10,82 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
 
-  const { kind = "trending", limit = "20", minVolume = "1000000" } = req.query;
+  const { kind = "trending", limit = "20" } = req.query;
   const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100);
-  const minVolumeNum = Math.max(Number(minVolume) || 1000000, 0); // Minimum volume threshold in USD (default: $1M)
+  // Parse minVolume - check req.query directly to allow 0 as a valid value
+  // This prevents the || operator from treating 0 as falsy when minVolume is explicitly set to "0"
+  const minVolumeProvided = req.query.minVolume !== undefined && req.query.minVolume !== null;
+  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 1000000;
+  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 1000000 : minVolumeParsed, 0); // Minimum volume threshold in USD (default: $1M)
 
   const GAMMA_API = "https://gamma-api.polymarket.com";
   
   try {
     let markets = [];
     
-    // Map kind to category slug (if it's a category, otherwise it's a sort mode)
-    const categoryMap = {
-      "sports": ["sports", "nfl", "nba", "mlb", "nhl", "ufc", "soccer", "tennis"],
-      "politics": ["politics", "election", "president"],
-      "crypto": ["crypto", "bitcoin", "ethereum", "defi"],
-      "entertainment": ["entertainment", "movies", "tv", "music"],
-      "economics": ["economics", "inflation", "gdp", "fed"],
-    };
+    // Check if kind is a category (not a sort mode like trending/volume/new)
+    const sortModes = ["trending", "volume", "new", "breaking"];
+    const isCategory = !sortModes.includes(kind);
     
-    if (kind === "sports") {
+    if (isCategory && kind !== "sports") {
+      // Fetch markets for a specific category
+      console.log("[markets] Fetching markets for category:", kind);
+      
+      // Get tag ID for this category
+      let categoryTagId = null;
+      try {
+        const tagsResp = await fetch(`${GAMMA_API}/tags`);
+        if (tagsResp.ok) {
+          const tags = await tagsResp.json();
+          if (Array.isArray(tags)) {
+            // Find tag matching the category slug
+            const categoryTag = tags.find(tag => {
+              const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+              return slug === kind.toLowerCase() || slug.includes(kind.toLowerCase());
+            });
+            if (categoryTag && categoryTag.id) {
+              categoryTagId = categoryTag.id;
+              console.log("[markets] Found tag ID for category:", categoryTagId);
+            }
+          }
+        }
+      } catch (e) {
+        console.log("[markets] Error fetching tags for category:", e.message);
+      }
+      
+      // Fetch markets for this category
+      if (categoryTagId) {
+        try {
+          const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&active=true&limit=100`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data)) {
+              markets = data.filter(m => !m.closed && m.active !== false);
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error fetching category markets:", e.message);
+        }
+      }
+      
+      // Fallback: also try general markets if category-specific fetch didn't work
+      if (markets.length === 0) {
+        try {
+          const url = `${GAMMA_API}/markets?closed=false&active=true&limit=100`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data)) {
+              markets = data.filter(m => !m.closed && m.active !== false);
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error fetching general markets:", e.message);
+        }
+      }
+      
+    } else if (kind === "sports") {
       console.log("[markets] Fetching sports markets from all categories...");
       
       // Get all tags to find sports-related tags

@@ -443,6 +443,55 @@
       font-weight: 600;
       color: var(--text);
     }
+    
+    /* Category Scroll Container */
+    .category-scroll-container {
+      position: relative;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .category-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      padding: 4px 0;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    .category-scroll::-webkit-scrollbar {
+      display: none; /* Chrome/Safari */
+    }
+    .category-chip {
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-height: 40px;
+    }
+    .category-chip:active {
+      transform: scale(0.95);
+    }
+    .category-chip.active {
+      background: var(--green);
+      color: var(--text);
+    }
+    
+    /* Legacy mode-chips (keeping for backward compatibility) */
     .mode-chips {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -828,11 +877,10 @@
 
     <!-- Markets Card -->
     <div class="card">
-      <div class="mode-chips">
-        <button class="mode-chip active" data-kind="trending">🔥 Trending</button>
-        <button class="mode-chip" data-kind="volume">📈 Volume</button>
-        <button class="mode-chip" data-kind="new">🆕 New</button>
-        <button class="mode-chip" data-kind="sports">⚽ Sports</button>
+      <div class="category-scroll-container">
+        <div class="category-scroll" id="categoryScroll">
+          <div class="loading" style="padding: 10px;">Loading categories...</div>
+        </div>
       </div>
       
       <div class="markets-list" id="marketsList">
@@ -897,6 +945,7 @@
       wallet: null,
       markets: [],
       selectedMarket: null,
+      selectedCategory: null,
       tradeSide: 'yes',
     };
 
@@ -1156,6 +1205,56 @@
     }
 
     // =====================
+    // CATEGORIES
+    // =====================
+    async function fetchCategories() {
+      try {
+        const resp = await fetch('/api/categories');
+        if (resp.ok) {
+          const data = await resp.json();
+          return data.categories || [];
+        }
+      } catch (err) {
+        console.error('[fetchCategories] Error:', err);
+      }
+      return [];
+    }
+
+    function renderCategories(categories) {
+      const container = document.getElementById('categoryScroll');
+      if (!container) return;
+
+      container.innerHTML = categories.map(cat => {
+        const isActive = state.selectedCategory === cat.slug;
+        return `
+          <button class="category-chip ${isActive ? 'active' : ''}" 
+                  data-kind="${cat.slug}" 
+                  data-id="${cat.id}">
+            ${cat.icon} ${cat.label}
+          </button>
+        `;
+      }).join('');
+
+      // Add click handlers
+      container.querySelectorAll('.category-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const kind = chip.dataset.kind;
+          state.selectedCategory = kind;
+          
+          // Update active state
+          container.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          
+          // Scroll to active chip (center it if possible)
+          chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          
+          // Fetch markets for this category
+          fetchMarkets(kind);
+        });
+      });
+    }
+
+    // =====================
     // MARKETS
     // =====================
     async function fetchMarkets(kind = 'trending') {
@@ -1291,6 +1390,7 @@
     // INIT
     // =====================
     function initModeChips() {
+      // Legacy support for old mode-chips if they exist
       document.querySelectorAll('.mode-chip[data-kind]').forEach(chip => {
         chip.addEventListener('click', () => {
           document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
@@ -1298,6 +1398,29 @@
           fetchMarkets(chip.dataset.kind);
         });
       });
+    }
+
+    async function initCategories() {
+      const categories = await fetchCategories();
+      if (categories.length > 0) {
+        renderCategories(categories);
+        // Set default to first category (usually "trending")
+        if (!state.selectedCategory && categories.length > 0) {
+          state.selectedCategory = categories[0].slug;
+          fetchMarkets(categories[0].slug);
+        }
+      } else {
+        // Fallback to default categories if API fails
+        const fallbackCategories = [
+          { slug: 'trending', label: 'Trending', icon: '🔥' },
+          { slug: 'volume', label: 'Volume', icon: '📈' },
+          { slug: 'new', label: 'New', icon: '🆕' },
+          { slug: 'sports', label: 'Sports', icon: '⚽' },
+        ];
+        renderCategories(fallbackCategories);
+        state.selectedCategory = 'trending';
+        fetchMarkets('trending');
+      }
     }
 
     function initTradeModal() {
@@ -1330,6 +1453,7 @@
       initTelegram();
       initModeChips();
       initTradeModal();
+      await initCategories();
 
       // Deposit button - shows wallet addresses for funding
       document.getElementById('depositBtn').addEventListener('click', async () => {
@@ -1362,7 +1486,7 @@
       });
 
       await loadWallet();
-      await fetchMarkets('trending');
+      // Markets will be fetched by initCategories()
       console.log('Bootstrap complete');
     }
 
