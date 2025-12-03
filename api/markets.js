@@ -10,8 +10,9 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
 
-  const { kind = "trending", limit = "20" } = req.query;
+  const { kind = "trending", limit = "20", minVolume = "1000000" } = req.query;
   const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const minVolumeNum = Math.max(Number(minVolume) || 1000000, 0); // Minimum volume threshold in USD (default: $1M)
 
   const GAMMA_API = "https://gamma-api.polymarket.com";
   
@@ -236,6 +237,16 @@ module.exports = async (req, res) => {
     });
 
     console.log("[markets] After price filter:", markets.length);
+
+    // Filter: must meet minimum volume threshold
+    markets = markets.filter(m => {
+      const volume24hr = parseFloat(m.volume24hr) || 0;
+      const volume = parseFloat(m.volume) || 0;
+      const totalVolume = Math.max(volume24hr, volume);
+      return totalVolume >= minVolumeNum;
+    });
+
+    console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length);
 
     // Sort by volume (highest first)
     markets.sort((a, b) => {
