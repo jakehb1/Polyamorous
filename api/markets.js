@@ -132,23 +132,61 @@ module.exports = async (req, res) => {
           if (Array.isArray(events)) {
             console.log("[markets] Fetched", events.length, "total events");
             
-            // Filter events by sport keyword
+            // Filter events by sport keyword - check tags, slug, title, and ticker
             for (const event of events) {
               const eventSlug = (event.slug || "").toLowerCase();
               const eventTitle = (event.title || "").toLowerCase();
               const eventTicker = (event.ticker || "").toLowerCase();
               
-              // Check if event matches any of our search terms
-              const matches = searchTerms.some(term => 
+              // Check event tags for sport match
+              const eventTags = event.tags || [];
+              const tagMatches = Array.isArray(eventTags) && eventTags.some(tag => {
+                const tagSlug = (tag.slug || tag.label || "").toLowerCase();
+                return searchTerms.some(term => tagSlug.includes(term) || term.includes(tagSlug));
+              });
+              
+              // Check if event matches any of our search terms in slug/title/ticker
+              const textMatches = searchTerms.some(term => 
                 eventSlug.includes(term) || 
                 eventTitle.includes(term) ||
                 eventTicker.includes(term)
               );
               
+              // Match if either tags or text match
+              const matches = tagMatches || textMatches;
+              
               if (matches && event.markets && Array.isArray(event.markets)) {
+                // For games only, filter to actual game markets (not props)
+                if (isGamesOnly) {
+                  // Check if this event has game-like markets (vs, moneyline, spread)
+                  const hasGameMarkets = event.markets.some(m => {
+                    const question = (m.question || "").toLowerCase();
+                    return question.includes(" vs ") || 
+                           question.includes(" v ") ||
+                           question.includes("moneyline") ||
+                           question.includes("spread") ||
+                           question.includes("total") && !question.includes("player");
+                  });
+                  
+                  if (!hasGameMarkets) {
+                    // Skip events that don't have game markets (they're props/futures)
+                    continue;
+                  }
+                }
+                
                 // Extract all markets from this event (game)
                 for (const market of event.markets) {
                   if (!market.closed && market.active !== false) {
+                    // For games only, filter out prop markets
+                    if (isGamesOnly) {
+                      const question = (market.question || "").toLowerCase();
+                      // Skip obvious props
+                      if (question.includes("will ") && 
+                          (question.includes("win") || question.includes("mvp") || question.includes("award"))) {
+                        continue;
+                      }
+                    }
+                    
                     // Avoid duplicates
                     const existing = markets.find(m => m.id === market.id);
                     if (!existing) {
@@ -192,42 +230,9 @@ module.exports = async (req, res) => {
               categoryTagId = categoryTag.id;
               console.log("[markets] Found tag ID for sports subcategory:", categoryTagId);
               
-              // Fetch events with this tag
-              try {
-                const eventsUrl = `${GAMMA_API}/events?tag_id=${categoryTagId}&closed=false&active=true&limit=1000`;
-                const eventsResp = await fetch(eventsUrl);
-                if (eventsResp.ok) {
-                  const events = await eventsResp.json();
-                  if (Array.isArray(events)) {
-                    for (const event of events) {
-                      if (event.markets && Array.isArray(event.markets)) {
-                        for (const market of event.markets) {
-                          if (!market.closed && market.active !== false) {
-                            const existing = markets.find(m => m.id === market.id);
-                            if (!existing) {
-                              markets.push({
-                                ...market,
-                                eventId: event.id,
-                                eventTitle: event.title,
-                                eventSlug: event.slug,
-                                eventTicker: event.ticker,
-                                eventStartDate: event.startDate,
-                                eventEndDate: event.endDate,
-                                eventImage: event.image || event.icon,
-                                eventVolume: event.volume,
-                                eventLiquidity: event.liquidity,
-                              });
-                            }
-                          }
-                        }
-                      }
-                    }
-                    console.log("[markets] Found", events.length, "events with tag, total markets:", markets.length);
-                  }
-                }
-              } catch (e) {
-                console.log("[markets] Error fetching events by tag:", e.message);
-              }
+              // Note: events API might not support tag_id parameter
+              // We'll rely on Strategy 1 which checks event tags
+              console.log("[markets] Tag ID found, but events API may not support tag_id filter");
             }
           }
         }
@@ -268,26 +273,46 @@ module.exports = async (req, res) => {
                       }
                       
                       // Only add markets that belong to events
+                      let addedCount = 0;
                       for (const market of newMarkets) {
                         const marketId = market.id || market.conditionId;
                         const existing = markets.find(m => (m.id || m.conditionId) === marketId);
                         if (!existing && marketIdToEvent.has(marketId)) {
                           const event = marketIdToEvent.get(marketId);
-                          markets.push({
-                            ...market,
-                            eventId: event.id,
-                            eventTitle: event.title,
-                            eventSlug: event.slug,
-                            eventTicker: event.ticker,
-                            eventStartDate: event.startDate,
-                            eventEndDate: event.endDate,
-                            eventImage: event.image || event.icon,
-                            eventVolume: event.volume,
-                            eventLiquidity: event.liquidity,
-                          });
+                          const question = (market.question || "").toLowerCase();
+                          
+                          // Additional filter: only include game markets (not props)
+                          // Game markets have "vs", "moneyline", "spread", or "total" in question
+                          const isGameMarket = 
+                            question.includes(" vs ") ||
+                            question.includes(" v ") ||
+                            question.includes("moneyline") ||
+                            question.includes("spread") ||
+                            (question.includes("total") && !question.includes("player"));
+                          
+                          // Exclude obvious props
+                          const isProp = 
+                            question.includes("will ") && 
+                            (question.includes("win") || question.includes("mvp") || question.includes("award") || question.includes("leader"));
+                          
+                          if (isGameMarket && !isProp) {
+                            markets.push({
+                              ...market,
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventSlug: event.slug,
+                              eventTicker: event.ticker,
+                              eventStartDate: event.startDate,
+                              eventEndDate: event.endDate,
+                              eventImage: event.image || event.icon,
+                              eventVolume: event.volume,
+                              eventLiquidity: event.liquidity,
+                            });
+                            addedCount++;
+                          }
                         }
                       }
-                      console.log("[markets] Added", markets.length, "game markets matched to events");
+                      console.log("[markets] Added", addedCount, "game markets matched to events (total:", markets.length, ")");
                     }
                   }
                 } catch (e) {
