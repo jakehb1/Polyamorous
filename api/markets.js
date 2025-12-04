@@ -240,23 +240,69 @@ module.exports = async (req, res) => {
                 // Extract all markets from this event (game)
                   for (const market of event.markets) {
                   if (!market.closed && market.active !== false) {
-                    // For games only, filter out prop markets - be very strict
+                    // For games only, ONLY include markets that look like actual games
                     if (isGamesOnly) {
                       const question = (market.question || "").toLowerCase();
                       const slug = (market.slug || "").toLowerCase();
                       
-                      // Exclude only clearly prop markets (be less strict - include more)
-                      const isDefinitelyProp = 
-                        (question.includes("will ") && (question.includes("leader") || question.includes("mvp") || question.includes("award"))) ||
-                        question.includes("leader") ||
+                      // WHITELIST: Only include markets with clear game indicators
+                      const hasGameIndicator = 
+                        question.includes(" vs ") ||
+                        question.includes(" v ") ||
+                        question.includes("moneyline") ||
+                        question.includes("spread") ||
+                        question.includes("total") ||
+                        question.includes("o/u") ||
+                        question.includes("over/under") ||
+                        question.includes("over ") ||
+                        question.includes("under ") ||
+                        slug.includes("moneyline") ||
+                        slug.includes("spread") ||
+                        slug.includes("total") ||
+                        slug.includes("o/u") ||
+                        slug.includes("over-under");
+                      
+                      // BLACKLIST: Exclude all prop markets
+                      // "Will" questions are props UNLESS they're about a team winning a specific game (which would have game indicators)
+                      const isWillQuestion = question.includes("will ");
+                      const isPlayerProp = isWillQuestion && (
+                        question.includes("rookie of the year") ||
+                        question.includes("offensive rookie") ||
+                        question.includes("defensive rookie") ||
+                        question.includes("offensive player of the year") ||
+                        question.includes("defensive player of the year") ||
                         question.includes("mvp") ||
+                        question.includes("leader") ||
+                        question.includes("award") ||
+                        question.includes("champion") ||
+                        question.includes("be the") || // "Will X be the Y" is usually a prop
+                        question.includes("in 2025") || // Season-long predictions
+                        question.includes("in 2026") ||
+                        question.includes("2025-2026") ||
+                        question.includes("2026-2027")
+                      );
+                      
+                      const isDefinitelyProp = 
+                        isPlayerProp ||
+                        (!hasGameIndicator && isWillQuestion) || // "Will" without game indicators is a prop
+                        question.includes("rookie of the year") ||
+                        question.includes("offensive rookie") ||
+                        question.includes("defensive rookie") ||
+                        question.includes("offensive player of the year") ||
+                        question.includes("defensive player of the year") ||
+                        question.includes("mvp") ||
+                        question.includes("leader") ||
                         question.includes("award") ||
                         (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
-                        (question.includes("winner") && !question.includes("week") && !question.includes("vs") && !question.includes("moneyline")) ||
-                        (slug.includes("prop") && (slug.includes("leader") || slug.includes("mvp")));
+                        (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+                        (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
+                        slug.includes("prop") ||
+                        slug.includes("rookie") ||
+                        slug.includes("mvp") ||
+                        slug.includes("leader");
                       
-                      // Include everything else (games, spreads, totals, moneyline, etc.)
-                      if (isDefinitelyProp) {
+                      // Only include if it has game indicators AND is not a prop
+                      if (!hasGameIndicator || isDefinitelyProp) {
                         continue;
                       }
                     }
@@ -376,9 +422,9 @@ module.exports = async (req, res) => {
                 const eventTags = (event.tags || []).map(t => (t.slug || t.label || "").toLowerCase());
                 
                 // Check if event is NFL-related
-                const hasNflTag = eventTags.some(t => 'nfl' in t);
-                const hasNflTeam = nflTeams.some(team => team in eventTitle || team in eventSlug);
-                const hasWeek = 'week' in eventTitle || 'week' in eventSlug || eventTags.some(t => 'week' in t);
+                const hasNflTag = eventTags.some(t => t.includes('nfl'));
+                const hasNflTeam = nflTeams.some(team => eventTitle.includes(team) || eventSlug.includes(team));
+                const hasWeek = eventTitle.includes('week') || eventSlug.includes('week') || eventTags.some(t => t.includes('week'));
                 const hasVs = eventTitle.includes(" vs ") || eventSlug.includes(" vs ") || eventTitle.includes(" v ");
                 
                 // Check if markets look like games
@@ -398,15 +444,65 @@ module.exports = async (req, res) => {
                     for (const market of event.markets) {
                       if (!market.closed && market.active !== false) {
                         const question = (market.question || "").toLowerCase();
-                        // Exclude props
-                        const isProp = 
-                          (question.includes("will ") && (question.includes("leader") || question.includes("mvp") || question.includes("award") || (question.includes("super bowl") && !question.includes("week")) || (question.includes("champion") && !question.includes("week")))) ||
-                          question.includes("leader") ||
-                          question.includes("mvp") ||
-                          (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
-                          (question.includes("champion") && !question.includes("week") && !question.includes("vs"));
+                        const slug = (market.slug || "").toLowerCase();
                         
-                        if (!isProp) {
+                        // WHITELIST: Only include markets with clear game indicators
+                        const hasGameIndicator = 
+                          question.includes(" vs ") ||
+                          question.includes(" v ") ||
+                          question.includes("moneyline") ||
+                          question.includes("spread") ||
+                          question.includes("total") ||
+                          question.includes("o/u") ||
+                          question.includes("over/under") ||
+                          question.includes("over ") ||
+                          question.includes("under ") ||
+                          slug.includes("moneyline") ||
+                          slug.includes("spread") ||
+                          slug.includes("total") ||
+                          slug.includes("o/u") ||
+                          slug.includes("over-under");
+                        
+                        // BLACKLIST: Exclude all prop markets
+                        const isWillQuestion = question.includes("will ");
+                        const isPlayerProp = isWillQuestion && (
+                          question.includes("rookie of the year") ||
+                          question.includes("offensive rookie") ||
+                          question.includes("defensive rookie") ||
+                          question.includes("offensive player of the year") ||
+                          question.includes("defensive player of the year") ||
+                          question.includes("mvp") ||
+                          question.includes("leader") ||
+                          question.includes("award") ||
+                          question.includes("champion") ||
+                          question.includes("be the") ||
+                          question.includes("in 2025") ||
+                          question.includes("in 2026") ||
+                          question.includes("2025-2026") ||
+                          question.includes("2026-2027")
+                        );
+                        
+                        const isDefinitelyProp = 
+                          isPlayerProp ||
+                          (!hasGameIndicator && isWillQuestion) ||
+                          question.includes("rookie of the year") ||
+                          question.includes("offensive rookie") ||
+                          question.includes("defensive rookie") ||
+                          question.includes("offensive player of the year") ||
+                          question.includes("defensive player of the year") ||
+                          question.includes("mvp") ||
+                          question.includes("leader") ||
+                          question.includes("award") ||
+                          (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
+                          (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+                          (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
+                          slug.includes("prop") ||
+                          slug.includes("rookie") ||
+                          slug.includes("mvp") ||
+                          slug.includes("leader");
+                        
+                        // Only include if it has game indicators AND is not a prop
+                        if (hasGameIndicator && !isDefinitelyProp) {
                           const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
                           if (!existing) {
                             markets.push({
@@ -460,26 +556,65 @@ module.exports = async (req, res) => {
                 const question = (m.question || "").toLowerCase();
                 const slug = (m.slug || "").toLowerCase();
                 
-                // Must have game structure
+                // WHITELIST: Must have game structure
                 const hasGameStructure = 
                   question.includes(" vs ") ||
                   question.includes(" v ") ||
                   question.includes("moneyline") ||
                   question.includes("ml") ||
                   question.includes("spread") ||
-                  (question.includes("total") && !question.includes("player") && !question.includes("leader"));
+                  question.includes("total") ||
+                  question.includes("o/u") ||
+                  question.includes("over/under") ||
+                  question.includes("over ") ||
+                  question.includes("under ") ||
+                  slug.includes("moneyline") ||
+                  slug.includes("spread") ||
+                  slug.includes("total") ||
+                  slug.includes("o/u") ||
+                  slug.includes("over-under");
                 
                 // Must mention NFL teams
                 const teamCount = nflTeams.filter(team => question.includes(team) || slug.includes(team)).length;
                 const hasNflTeams = teamCount > 0;
                 
-                // Exclude props
-                const isProp = 
-                  (question.includes("will ") && (question.includes("leader") || question.includes("mvp") || question.includes("award") || (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) || (question.includes("champion") && !question.includes("week") && !question.includes("vs")))) ||
-                  question.includes("leader") ||
+                // BLACKLIST: Exclude all prop markets
+                const isWillQuestion = question.includes("will ");
+                const isPlayerProp = isWillQuestion && (
+                  question.includes("rookie of the year") ||
+                  question.includes("offensive rookie") ||
+                  question.includes("defensive rookie") ||
+                  question.includes("offensive player of the year") ||
+                  question.includes("defensive player of the year") ||
                   question.includes("mvp") ||
+                  question.includes("leader") ||
+                  question.includes("award") ||
+                  question.includes("champion") ||
+                  question.includes("be the") ||
+                  question.includes("in 2025") ||
+                  question.includes("in 2026") ||
+                  question.includes("2025-2026") ||
+                  question.includes("2026-2027")
+                );
+                
+                const isProp = 
+                  isPlayerProp ||
+                  (!hasGameStructure && isWillQuestion) ||
+                  question.includes("rookie of the year") ||
+                  question.includes("offensive rookie") ||
+                  question.includes("defensive rookie") ||
+                  question.includes("offensive player of the year") ||
+                  question.includes("defensive player of the year") ||
+                  question.includes("mvp") ||
+                  question.includes("leader") ||
+                  question.includes("award") ||
+                  (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
                   (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
-                  (question.includes("champion") && !question.includes("week") && !question.includes("vs"));
+                  (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
+                  slug.includes("prop") ||
+                  slug.includes("rookie") ||
+                  slug.includes("mvp") ||
+                  slug.includes("leader");
                 
                 return hasGameStructure && hasNflTeams && !isProp;
               });
