@@ -152,7 +152,11 @@ module.exports = async (req, res) => {
                              'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
                              'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
                              'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
-                             'chicago', 'green bay', 'los angeles', 'arizona', 'houston'];
+                             'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                             // Team abbreviations
+                             'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                             'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                             'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
             
             // Filter events by sport keyword - check tags, slug, title, ticker, AND team names
               for (const event of events) {
@@ -402,7 +406,7 @@ module.exports = async (req, res) => {
           if (allEventsResp.ok) {
             const allEvents = await allEventsResp.json();
             if (Array.isArray(allEvents)) {
-              // NFL team names for matching
+              // NFL team names for matching (including abbreviations)
               const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
                                'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
                                'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
@@ -411,7 +415,11 @@ module.exports = async (req, res) => {
                                'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
                                'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
                                'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
-                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston'];
+                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                               // Team abbreviations
+                               'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                               'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                               'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
               
               // Find events that look like NFL games
               for (const event of allEvents) {
@@ -541,7 +549,7 @@ module.exports = async (req, res) => {
             if (Array.isArray(data)) {
               const allMarkets = data.filter(m => !m.closed && m.active !== false);
               
-              // NFL team names
+              // NFL team names (including abbreviations)
               const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
                                'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
                                'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
@@ -550,7 +558,11 @@ module.exports = async (req, res) => {
                                'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
                                'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
                                'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
-                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston'];
+                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                               // Team abbreviations
+                               'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                               'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                               'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
               
               const gameMarkets = allMarkets.filter(m => {
                 const question = (m.question || "").toLowerCase();
