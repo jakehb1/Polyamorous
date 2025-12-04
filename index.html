@@ -588,6 +588,76 @@
       color: var(--text-muted);
     }
 
+    /* Event Grouping (for NFL games) */
+    .event-group {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .event-header {
+      display: flex;
+      gap: 12px;
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .event-image {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+    .event-image.hidden {
+      display: none;
+    }
+    .event-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .event-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .week-tag {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .event-markets {
+      padding: 0;
+    }
+    .market-item.nested {
+      border-radius: 0;
+      border-bottom: 1px solid var(--border);
+      margin: 0;
+    }
+    .market-item.nested:last-child {
+      border-bottom: none;
+    }
+    .market-item.nested .market-question {
+      font-size: 13px;
+    }
+
     /* Modal */
     .modal-overlay {
       position: fixed;
@@ -1409,29 +1479,109 @@
     function renderMarkets(markets) {
       const list = document.getElementById('marketsList');
       
-      list.innerHTML = markets.map(m => {
-        const prices = m.outcomePrices || [];
-        const yesPrice = prices[0] ? (parseFloat(prices[0]) * 100).toFixed(0) : '--';
-        const vol = m.volume24hr || m.volume || 0;
-        const imgUrl = m.image || m.eventImage || m.icon || '';
-        const hasImage = imgUrl && imgUrl.trim() !== '';
+      // Check if we should group by events (for NFL games)
+      const shouldGroupByEvent = state.selectedCategory === 'nfl' && 
+                                  markets.some(m => m.eventId && m.eventTitle);
+      
+      if (shouldGroupByEvent && markets.length > 0) {
+        // Group markets by event
+        const eventsMap = new Map();
+        markets.forEach(m => {
+          const eventId = m.eventId || 'ungrouped';
+          const eventTitle = m.eventTitle || 'Other Markets';
+          
+          if (!eventsMap.has(eventId)) {
+            eventsMap.set(eventId, {
+              eventId: eventId,
+              eventTitle: eventTitle,
+              eventImage: m.eventImage || m.image,
+              eventVolume: m.eventVolume || 0,
+              eventStartDate: m.eventStartDate,
+              markets: []
+            });
+          }
+          eventsMap.get(eventId).markets.push(m);
+        });
         
-        return `
-          <div class="market-item" data-id="${m.id}">
-            ${hasImage ? `<img class="market-image" src="${imgUrl}" alt="" onerror="this.classList.add('hidden')" />` : ''}
-            <div class="market-info">
-              <div class="market-question">${m.question}</div>
-              <div class="market-meta">
-                <span>Vol: ${formatVolume(vol)}</span>
+        // Render events with their markets
+        list.innerHTML = Array.from(eventsMap.values()).map(event => {
+          const eventVol = event.eventVolume || 
+                          event.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
+          const eventImg = event.eventImage || event.markets[0]?.image || '';
+          const hasImage = eventImg && eventImg.trim() !== '';
+          
+          // Get week tag if available
+          const weekTag = event.markets[0]?.eventTags?.find(t => 
+            (typeof t === 'string' ? t : (t.slug || t.label || '')).toLowerCase().includes('week')
+          );
+          const weekLabel = weekTag ? (typeof weekTag === 'string' ? weekTag : (weekTag.label || weekTag.slug || '')) : '';
+          
+          return `
+            <div class="event-group" data-event-id="${event.eventId}">
+              <div class="event-header">
+                ${hasImage ? `<img class="event-image" src="${eventImg}" alt="" onerror="this.classList.add('hidden')" />` : ''}
+                <div class="event-info">
+                  <div class="event-title">
+                    ${weekLabel ? `<span class="week-tag">${weekLabel}</span>` : ''}
+                    ${event.eventTitle}
+                  </div>
+                  <div class="event-meta">
+                    <span>Vol: ${formatVolume(eventVol)}</span>
+                    <span>${event.markets.length} market${event.markets.length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="event-markets">
+                ${event.markets.map(m => {
+                  const prices = m.outcomePrices || [];
+                  const yesPrice = prices[0] ? (parseFloat(prices[0]) * 100).toFixed(0) : '--';
+                  const vol = m.volume24hr || m.volume || 0;
+                  
+                  return `
+                    <div class="market-item nested" data-id="${m.id}">
+                      <div class="market-info">
+                        <div class="market-question">${m.question}</div>
+                        <div class="market-meta">
+                          <span>Vol: ${formatVolume(vol)}</span>
+                        </div>
+                      </div>
+                      <div class="market-odds">
+                        <div class="odds-yes">${yesPrice}¢</div>
+                        <div class="odds-vol">Yes</div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
               </div>
             </div>
-            <div class="market-odds">
-              <div class="odds-yes">${yesPrice}¢</div>
-              <div class="odds-vol">Yes</div>
+          `;
+        }).join('');
+      } else {
+        // Render as flat list (original behavior)
+        list.innerHTML = markets.map(m => {
+          const prices = m.outcomePrices || [];
+          const yesPrice = prices[0] ? (parseFloat(prices[0]) * 100).toFixed(0) : '--';
+          const vol = m.volume24hr || m.volume || 0;
+          const imgUrl = m.image || m.eventImage || m.icon || '';
+          const hasImage = imgUrl && imgUrl.trim() !== '';
+          
+          return `
+            <div class="market-item" data-id="${m.id}">
+              ${hasImage ? `<img class="market-image" src="${imgUrl}" alt="" onerror="this.classList.add('hidden')" />` : ''}
+              <div class="market-info">
+                <div class="market-question">${m.question}</div>
+                <div class="market-meta">
+                  <span>Vol: ${formatVolume(vol)}</span>
+                </div>
+              </div>
+              <div class="market-odds">
+                <div class="odds-yes">${yesPrice}¢</div>
+                <div class="odds-vol">Yes</div>
+              </div>
             </div>
-          </div>
-        `;
-      }).join('');
+          `;
+        }).join('');
+      }
 
       // Add click handlers
       list.querySelectorAll('.market-item').forEach(item => {

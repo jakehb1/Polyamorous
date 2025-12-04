@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
       if (categoryTagId) {
         try {
           // Fetch with high limit to get all markets in this category
-          const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&active=true&limit=1000`;
+          const url = `${GAMMA_API}/markets?tag_id=${categoryTagId}&closed=false&limit=1000`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
@@ -77,7 +77,7 @@ module.exports = async (req, res) => {
       
       // Also fetch general markets to ensure we get all markets in this category
       try {
-        const url = `${GAMMA_API}/markets?closed=false&active=true&limit=1000`;
+        const url = `${GAMMA_API}/markets?closed=false&limit=1000`;
         const resp = await fetch(url);
         if (resp.ok) {
           const data = await resp.json();
@@ -136,7 +136,7 @@ module.exports = async (req, res) => {
       // Strategy 1: Fetch events directly (this gives us game structure)
       try {
         // Increase limit to get more events
-        const eventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=2000`;
+        const eventsUrl = `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=2000`;
         const eventsResp = await fetch(eventsUrl);
         if (eventsResp.ok) {
           const events = await eventsResp.json();
@@ -401,7 +401,7 @@ module.exports = async (req, res) => {
       if (kind.toLowerCase() === "nfl" && isGamesOnly) {
         // Approach 0: Query by NFL series ID first (most direct)
         try {
-          const seriesEventsUrl = `${GAMMA_API}/events?series=10187&closed=false&active=true&limit=2000`;
+          const seriesEventsUrl = `${GAMMA_API}/events?series=10187&closed=false&order=id&ascending=false&limit=2000`;
           const seriesEventsResp = await fetch(seriesEventsUrl);
           if (seriesEventsResp.ok) {
             const seriesEvents = await seriesEventsResp.json();
@@ -415,12 +415,40 @@ module.exports = async (req, res) => {
         }
         
         // Approach 1: Search all events for NFL game events
+        // Following docs: /events endpoint is most efficient (events contain their markets)
+        // Use order=id&ascending=false to get newest events first
         try {
-          const allEventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=2000`;
-          const allEventsResp = await fetch(allEventsUrl);
-          if (allEventsResp.ok) {
-            const allEvents = await allEventsResp.json();
-            if (Array.isArray(allEvents)) {
+          // Try multiple event queries to be comprehensive
+          const eventQueries = [
+            `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=2000`,
+            `${GAMMA_API}/events?series=10187&closed=false&order=id&ascending=false&limit=2000`,
+            `${GAMMA_API}/events?tag_id=1&closed=false&order=id&ascending=false&limit=2000`,
+            `${GAMMA_API}/events?tag_id=450&closed=false&order=id&ascending=false&limit=2000`,
+            `${GAMMA_API}/events?tag_id=100639&closed=false&order=id&ascending=false&limit=2000`,
+          ];
+          
+          let allEvents = [];
+          for (const eventUrl of eventQueries) {
+            try {
+              const eventResp = await fetch(eventUrl);
+              if (eventResp.ok) {
+                const events = await eventResp.json();
+                if (Array.isArray(events)) {
+                  // Merge events, avoiding duplicates
+                  for (const event of events) {
+                    const existing = allEvents.find(e => e.id === event.id);
+                    if (!existing) {
+                      allEvents.push(event);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.log("[markets] Error fetching events from", eventUrl, ":", e.message);
+            }
+          }
+          
+          if (Array.isArray(allEvents) && allEvents.length > 0) {
               // NFL team names for matching (including abbreviations)
               const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
                                'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
@@ -564,7 +592,6 @@ module.exports = async (req, res) => {
               }
               console.log("[markets] Checked", checkedCount, "potential game events, matched", matchedCount, "events, found", markets.length, "markets");
               console.log("[markets] Added NFL game markets from events search");
-            }
           }
         } catch (e) {
           console.log("[markets] Error searching events for NFL games:", e.message);
@@ -575,7 +602,7 @@ module.exports = async (req, res) => {
           const nflTagIds = [1, 450, 100639];
           console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
           for (const tagId of nflTagIds) {
-            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&active=true&limit=2000`;
+            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000`;
             const tagMarketsResp = await fetch(tagMarketsUrl);
             if (tagMarketsResp.ok) {
               const tagMarkets = await tagMarketsResp.json();
@@ -600,7 +627,7 @@ module.exports = async (req, res) => {
         
         // Approach 3: Search all markets for game structure
         try {
-          const url = `${GAMMA_API}/markets?closed=false&active=true&limit=10000`;
+          const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
@@ -708,7 +735,7 @@ module.exports = async (req, res) => {
           const tagIdsToUse = categoryTagIds.length > 0 ? categoryTagIds : (categoryTagId ? [categoryTagId] : []);
           const marketFetchPromises = tagIdsToUse.map(async (tagId) => {
             try {
-              const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&active=true&limit=1000`;
+              const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=1000`;
             const resp = await fetch(url);
             if (resp.ok) {
               const data = await resp.json();
@@ -784,7 +811,7 @@ module.exports = async (req, res) => {
       
       // Also try fetching from events endpoint for live sports events
       try {
-        const eventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=100`;
+        const eventsUrl = `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=100`;
         const eventsResp = await fetch(eventsUrl);
         if (eventsResp.ok) {
           const events = await eventsResp.json();
@@ -839,7 +866,7 @@ module.exports = async (req, res) => {
             
             for (const tagId of sportsTagIds.slice(0, 10)) {
               try {
-                const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&active=true&limit=50`;
+                const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=50`;
                 const resp = await fetch(url);
                 if (resp.ok) {
                   const data = await resp.json();
@@ -867,7 +894,7 @@ module.exports = async (req, res) => {
       // This ensures we get a comprehensive 1:1 match with Polymarket
       try {
         // Fetch all active markets with high limit
-        const url = `${GAMMA_API}/markets?closed=false&active=true&limit=10000`;
+        const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
       const resp = await fetch(url);
       if (resp.ok) {
         const data = await resp.json();
@@ -882,7 +909,7 @@ module.exports = async (req, res) => {
       
       // Also fetch from events endpoint to get event-based markets (sports games, etc.)
       try {
-        const eventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=1000`;
+        const eventsUrl = `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=1000`;
         const eventsResp = await fetch(eventsUrl);
         if (eventsResp.ok) {
           const events = await eventsResp.json();
@@ -1031,6 +1058,16 @@ module.exports = async (req, res) => {
                         'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
       
       console.log("[markets] Filtering", markets.length, "markets for NFL games (removing props)");
+      
+      // Log sample of what we have before filtering
+      if (markets.length > 0) {
+        console.log("[markets] Sample markets before filtering:");
+        for (const m of markets.slice(0, 5)) {
+          console.log(`  - "${m.question || 'N/A'}" (Event: ${m.eventTitle || 'N/A'})`);
+        }
+      }
+      
+      const marketsBeforeFilter = markets.length;
       markets = markets.filter(m => {
         const question = (m.question || "").toLowerCase();
         const slug = (m.slug || "").toLowerCase();
@@ -1080,7 +1117,15 @@ module.exports = async (req, res) => {
         
         return !isProp; // Keep if not a prop
       });
-      console.log("[markets] After filtering:", markets.length, "game markets remaining");
+      console.log("[markets] After filtering:", markets.length, "game markets remaining (filtered out", marketsBeforeFilter - markets.length, "markets)");
+      
+      // If we have no markets, log what we had before filtering to debug
+      if (markets.length === 0 && marketsBeforeFilter > 0) {
+        console.log("[markets] WARNING: All markets were filtered out. This might indicate:");
+        console.log("[markets] 1. Games aren't in the API yet");
+        console.log("[markets] 2. Games are structured differently than expected");
+        console.log("[markets] 3. Filtering is too strict");
+      }
     }
 
     // Transform
@@ -1125,6 +1170,7 @@ module.exports = async (req, res) => {
         eventImage: m.eventImage,
         eventVolume: m.eventVolume ? parseFloat(m.eventVolume) : 0,
         eventLiquidity: m.eventLiquidity ? parseFloat(m.eventLiquidity) : 0,
+        eventTags: m.eventTags || [],
       };
     });
 
