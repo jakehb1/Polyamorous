@@ -1436,7 +1436,9 @@
       // Add click handlers
       list.querySelectorAll('.market-item').forEach(item => {
         item.addEventListener('click', () => {
-          const market = markets.find(m => m.id === item.dataset.id);
+          // Fix type mismatch: convert both to strings for comparison
+          const itemId = String(item.dataset.id);
+          const market = markets.find(m => String(m.id) === itemId || String(m.conditionId) === itemId);
           if (market) openTradeModal(market);
         });
       });

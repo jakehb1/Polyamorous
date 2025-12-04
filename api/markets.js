@@ -89,8 +89,11 @@ module.exports = async (req, res) => {
                 if (m.closed || m.active === false) return false;
                 // Check if market has matching tag_id in its tags array or tagId field
                 const marketTags = m.tags || m.tagIds || [];
-                return Array.isArray(marketTags) && marketTags.includes(categoryTagId) ||
-                       m.tagId === categoryTagId || m.tag_id === categoryTagId;
+                // Fix operator precedence: properly group the OR conditions
+                // Check: (tags array includes tag) OR (tagId matches) OR (tag_id matches)
+                return (Array.isArray(marketTags) && marketTags.includes(categoryTagId)) ||
+                       m.tagId === categoryTagId || 
+                       m.tag_id === categoryTagId;
               });
               markets.push(...categoryMarkets);
             } else {
@@ -624,14 +627,21 @@ module.exports = async (req, res) => {
     if (sportType === "games" && isSportsSubcategory) {
       const beforeFilter = markets.length;
       markets = markets.filter(m => {
-        // Must have eventId (part of an actual game event)
-        if (!m.eventId && !m.eventTitle && !m.eventSlug && !m.eventTicker) {
-          return false;
-        }
-        
-        // Less strict filtering - exclude only clearly prop markets
         const question = (m.question || "").toLowerCase();
         const slug = (m.slug || "").toLowerCase();
+        
+        // Check if market looks like a game market (has eventId OR has game indicators)
+        const hasEventInfo = m.eventId || m.eventTitle || m.eventSlug || m.eventTicker;
+        const looksLikeGame = 
+          question.includes(" vs ") ||
+          question.includes(" v ") ||
+          question.includes("moneyline") ||
+          question.includes("ml") ||
+          question.includes("spread") ||
+          (question.includes("total") && !question.includes("player") && !question.includes("leader")) ||
+          slug.includes("moneyline") ||
+          slug.includes("spread") ||
+          slug.includes("total");
         
         // Exclude only clearly prop markets (leader, MVP, award markets)
         const isDefinitelyProp = 
@@ -643,8 +653,8 @@ module.exports = async (req, res) => {
           (question.includes("winner") && !question.includes("week") && !question.includes("vs") && !question.includes("moneyline")) ||
           (slug.includes("prop") && (slug.includes("leader") || slug.includes("mvp")));
         
-        // Include everything else (games, spreads, totals, moneyline, etc.)
-        return !isDefinitelyProp;
+        // Include if: (has event info OR looks like a game) AND is not a prop
+        return (hasEventInfo || looksLikeGame) && !isDefinitelyProp;
       });
       console.log("[markets] After games-only filter:", markets.length, "(removed", beforeFilter - markets.length, "non-game markets)");
     }
