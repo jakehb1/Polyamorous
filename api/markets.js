@@ -399,6 +399,21 @@ module.exports = async (req, res) => {
       // Strategy 3: For NFL games, use multiple approaches to find game markets
       // Since tag-based queries return props, we need to search more broadly
       if (kind.toLowerCase() === "nfl" && isGamesOnly) {
+        // Approach 0: Query by NFL series ID first (most direct)
+        try {
+          const seriesEventsUrl = `${GAMMA_API}/events?series=10187&closed=false&active=true&limit=2000`;
+          const seriesEventsResp = await fetch(seriesEventsUrl);
+          if (seriesEventsResp.ok) {
+            const seriesEvents = await seriesEventsResp.json();
+            if (Array.isArray(seriesEvents)) {
+              console.log("[markets] Found", seriesEvents.length, "events in NFL series");
+              // Process these events (will be handled in Approach 1 below)
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error fetching NFL series events:", e.message);
+        }
+        
         // Approach 1: Search all events for NFL game events
         try {
           const allEventsUrl = `${GAMMA_API}/events?closed=false&active=true&limit=2000`;
@@ -555,7 +570,35 @@ module.exports = async (req, res) => {
           console.log("[markets] Error searching events for NFL games:", e.message);
         }
         
-        // Approach 2: Search all markets for game structure
+        // Approach 2: Query markets directly by NFL tag IDs (most direct)
+        try {
+          const nflTagIds = [1, 450, 100639];
+          console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
+          for (const tagId of nflTagIds) {
+            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&active=true&limit=2000`;
+            const tagMarketsResp = await fetch(tagMarketsUrl);
+            if (tagMarketsResp.ok) {
+              const tagMarkets = await tagMarketsResp.json();
+              if (Array.isArray(tagMarkets)) {
+                console.log("[markets] Found", tagMarkets.length, "markets with tag_id", tagId);
+                // Add all active markets - we'll filter props in the filtering step below
+                for (const market of tagMarkets) {
+                  if (!market.closed && market.active !== false) {
+                    const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                    if (!existing) {
+                      markets.push(market);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          console.log("[markets] Total markets from tag IDs:", markets.length);
+        } catch (e) {
+          console.log("[markets] Error fetching markets by tag IDs:", e.message);
+        }
+        
+        // Approach 3: Search all markets for game structure
         try {
           const url = `${GAMMA_API}/markets?closed=false&active=true&limit=10000`;
           const resp = await fetch(url);
@@ -970,6 +1013,74 @@ module.exports = async (req, res) => {
         const dateB = new Date(b.createdAt || b.startDate || 0);
         return dateB - dateA;
       });
+    }
+    
+    // Final filtering for NFL games: remove props, keep game markets
+    if (kind.toLowerCase() === "nfl" && sportType === "games") {
+      const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
+                        'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
+                        'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
+                        'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
+                        'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
+                        'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
+                        'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
+                        'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
+                        'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                        'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                        'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                        'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
+      
+      console.log("[markets] Filtering", markets.length, "markets for NFL games (removing props)");
+      markets = markets.filter(m => {
+        const question = (m.question || "").toLowerCase();
+        const slug = (m.slug || "").toLowerCase();
+        const eventTitle = (m.eventTitle || "").toLowerCase();
+        
+        // Check if it mentions NFL teams
+        const hasNflTeam = nflTeams.some(team => {
+          if (team.length <= 3) {
+            return new RegExp(`\\b${team}\\b`, 'i').test(question) || 
+                   new RegExp(`\\b${team}\\b`, 'i').test(slug) ||
+                   new RegExp(`\\b${team}\\b`, 'i').test(eventTitle);
+          }
+          return question.includes(team) || slug.includes(team) || eventTitle.includes(team);
+        });
+        
+        if (!hasNflTeam) return false; // Must mention NFL teams
+        
+        // Exclude props
+        const isProp = 
+          question.includes("will ") && (
+            question.includes("rookie of the year") ||
+            question.includes("offensive rookie") ||
+            question.includes("defensive rookie") ||
+            question.includes("mvp") ||
+            question.includes("leader") ||
+            question.includes("award") ||
+            question.includes("champion") ||
+            question.includes("be the") ||
+            question.includes("in 2025") ||
+            question.includes("in 2026") ||
+            question.includes("2025-2026") ||
+            question.includes("2026-2027") ||
+            (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+            (question.includes("playoff") && !question.includes("week") && !question.includes("vs"))
+          ) ||
+          question.includes("rookie of the year") ||
+          question.includes("offensive rookie") ||
+          question.includes("defensive rookie") ||
+          question.includes("mvp") ||
+          question.includes("leader") ||
+          question.includes("award") ||
+          (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
+          (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+          slug.includes("prop") ||
+          slug.includes("rookie") ||
+          slug.includes("mvp");
+        
+        return !isProp; // Keep if not a prop
+      });
+      console.log("[markets] After filtering:", markets.length, "game markets remaining");
     }
 
     // Transform
