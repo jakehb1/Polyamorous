@@ -28,10 +28,8 @@ module.exports = async (req, res) => {
     const sortModes = ["trending", "volume", "new", "breaking"];
     const isCategory = !sortModes.includes(kind);
     
-    // Check if this is a sports subcategory (like nfl, nba, etc.)
-    const sportsSubcategories = ["nfl", "nba", "mlb", "nhl", "wnba", "ufc", "soccer", "football", 
-                                 "basketball", "baseball", "hockey", "tennis", "cricket", "golf", 
-                                 "boxing", "formula", "f1", "epl", "cbb", "cfb"];
+    // Check if this is a sports subcategory - only NFL for now
+    const sportsSubcategories = ["nfl"];
     const isSportsSubcategory = sportsSubcategories.includes(kind.toLowerCase());
     
     if (isCategory && kind !== "sports" && !isSportsSubcategory) {
@@ -107,8 +105,17 @@ module.exports = async (req, res) => {
       
     } else if (isSportsSubcategory) {
       // Fetch game events for a specific sports subcategory (NFL, NBA, etc.)
+      // Focus only on NFL for now
+      if (kind.toLowerCase() !== "nfl") {
+        console.log("[markets] Skipping non-NFL sport:", kind, "- focusing on NFL only for now");
+        return res.status(200).json({ 
+          markets: [],
+          meta: { total: 0, kind, message: "Only NFL is supported at this time" }
+        });
+      }
+      
       const isGamesOnly = sportType === "games";
-      console.log("[markets] Fetching for sports subcategory:", kind, "sportType:", sportType, "gamesOnly:", isGamesOnly);
+      console.log("[markets] Fetching NFL games, sportType:", sportType, "gamesOnly:", isGamesOnly);
       
       // Map sport slugs to common variations for better matching
       const sportVariations = {
@@ -253,36 +260,67 @@ module.exports = async (req, res) => {
         console.log("[markets] Error fetching events:", e.message);
       }
       
-      // Strategy 2: Get tag ID and fetch events by tag
+      // Strategy 2: Get tag IDs from /sports endpoint (more reliable for NFL)
+      // Focus only on NFL for now
+      let categoryTagIds = [];
       let categoryTagId = null;
-      try {
-        const tagsResp = await fetch(`${GAMMA_API}/tags`);
-        if (tagsResp.ok) {
-          const tags = await tagsResp.json();
-          if (Array.isArray(tags)) {
-            // Find tag matching the sports subcategory
-            const categoryTag = tags.find(tag => {
-              const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
-              return searchTerms.some(term => slug === term || slug.includes(term));
-            });
-            if (categoryTag && categoryTag.id) {
-              categoryTagId = categoryTag.id;
-              console.log("[markets] Found tag ID for sports subcategory:", categoryTagId);
+      
+      // Only process NFL games for now
+      if (kind.toLowerCase() === "nfl") {
+        try {
+          const sportsResp = await fetch(`${GAMMA_API}/sports`);
+          if (sportsResp.ok) {
+            const sports = await sportsResp.json();
+            if (Array.isArray(sports)) {
+              // Find NFL sport entry
+              const nflSport = sports.find(s => {
+                const sportName = (s.sport || "").toLowerCase();
+                return sportName === "nfl";
+              });
               
-              // Note: events API might not support tag_id parameter
-              // We'll rely on Strategy 1 which checks event tags
-              console.log("[markets] Tag ID found, but events API may not support tag_id filter");
+              if (nflSport && nflSport.tags) {
+                // Tags are comma-separated string
+                const tagIds = nflSport.tags.split(',').map(id => id.trim()).filter(id => id);
+                categoryTagIds = tagIds;
+                categoryTagId = tagIds[0]; // Use first tag as primary
+                console.log("[markets] Found NFL tag IDs from /sports endpoint:", categoryTagIds);
+              }
             }
           }
+        } catch (e) {
+          console.log("[markets] Error fetching /sports:", e.message);
         }
-      } catch (e) {
-        console.log("[markets] Error fetching tags:", e.message);
+      }
+      
+      // Fallback: try to get tag ID from /tags endpoint
+      if (categoryTagIds.length === 0 && !categoryTagId) {
+        try {
+          const tagsResp = await fetch(`${GAMMA_API}/tags`);
+          if (tagsResp.ok) {
+            const tags = await tagsResp.json();
+            if (Array.isArray(tags)) {
+              // Find tag matching the sports subcategory
+              const categoryTag = tags.find(tag => {
+                const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+                return searchTerms.some(term => slug === term || slug.includes(term));
+              });
+              if (categoryTag && categoryTag.id) {
+                categoryTagId = categoryTag.id;
+                categoryTagIds = [categoryTag.id];
+                console.log("[markets] Found tag ID from /tags endpoint:", categoryTagId);
+              }
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error fetching tags:", e.message);
+        }
       }
       
       // Strategy 3: Fetch markets directly by tag IDs, then match to events for games
-      if (categoryTagIds.length > 0 || categoryTagId) {
+      // Only for NFL games for now
+      if (kind.toLowerCase() === "nfl" && (categoryTagIds.length > 0 || categoryTagId)) {
         // Use all tag IDs from /sports endpoint, or fallback to single tag ID
-        const tagIdsToUse = categoryTagIds.length > 0 ? categoryTagIds : [categoryTagId];
+        const tagIdsToUse = categoryTagIds.length > 0 ? categoryTagIds : (categoryTagId ? [categoryTagId] : []);
         
         // Fetch markets for each tag ID
         const marketFetchPromises = tagIdsToUse.map(async (tagId) => {

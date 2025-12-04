@@ -33,27 +33,9 @@ module.exports = async (req, res) => {
     }
 
     // Hardcoded list of known sports subcategories on Polymarket
-    // These are the main sports leagues/categories that have active markets
+    // Only NFL for now - other sports removed
     const knownSports = [
       { slug: 'nfl', label: 'NFL', searchTerms: ['nfl', 'american football'] },
-      { slug: 'nba', label: 'NBA', searchTerms: ['nba', 'basketball'] },
-      { slug: 'mlb', label: 'MLB', searchTerms: ['mlb', 'baseball'] },
-      { slug: 'nhl', label: 'NHL', searchTerms: ['nhl', 'hockey'] },
-      { slug: 'wnba', label: 'WNBA', searchTerms: ['wnba'] },
-      { slug: 'ufc', label: 'UFC', searchTerms: ['ufc', 'mma'] },
-      { slug: 'epl', label: 'EPL', searchTerms: ['epl', 'premier league', 'english premier league'] },
-      { slug: 'cfb', label: 'College Football', searchTerms: ['cfb', 'college football', 'ncaaf', 'ncaa football'] },
-      { slug: 'cbb', label: 'College Basketball', searchTerms: ['cbb', 'college basketball', 'ncaab', 'ncaa basketball'] },
-      { slug: 'mls', label: 'MLS', searchTerms: ['mls', 'major league soccer'] },
-      { slug: 'la-liga', label: 'La Liga', searchTerms: ['la liga', 'laliga'] },
-      { slug: 'bundesliga', label: 'Bundesliga', searchTerms: ['bundesliga'] },
-      { slug: 'serie-a', label: 'Serie A', searchTerms: ['serie a', 'seriea'] },
-      { slug: 'ligue-1', label: 'Ligue 1', searchTerms: ['ligue 1', 'ligue1'] },
-      { slug: 'tennis', label: 'Tennis', searchTerms: ['tennis'] },
-      { slug: 'golf', label: 'Golf', searchTerms: ['golf'] },
-      { slug: 'boxing', label: 'Boxing', searchTerms: ['boxing'] },
-      { slug: 'formula-1', label: 'Formula 1', searchTerms: ['formula 1', 'formula1', 'f1'] },
-      { slug: 'cricket', label: 'Cricket', searchTerms: ['cricket'] },
     ];
 
     const subcategories = [];
