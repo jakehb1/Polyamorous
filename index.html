@@ -1743,13 +1743,28 @@
         const resp = await fetch(`/api/wallet?telegram_id=${encodeURIComponent(state.telegramId)}`);
         
         if (!resp.ok) {
-          const errorData = await resp.json();
+          let errorData;
+          try {
+            errorData = await resp.json();
+          } catch (e) {
+            errorData = { message: `HTTP ${resp.status}: ${resp.statusText}` };
+          }
+          
+          // Check for specific error types
+          if (errorData.error === 'encryption_key_error' || errorData.code === 'ENCRYPTION_KEY_MISSING' || errorData.code === 'ENCRYPTION_KEY_INVALID_LENGTH') {
+            throw new Error('SERVER_CONFIG_ERROR');
+          }
+          
           throw new Error(errorData.message || `HTTP ${resp.status}: Failed to load wallet`);
         }
         
         const data = await resp.json();
         
         if (!data.success || !data.wallet) {
+          // Check if there's a warning (like missing Supabase)
+          if (data.warning) {
+            console.warn('Wallet warning:', data.warning);
+          }
           throw new Error('Invalid wallet response from server');
         }
         
@@ -1802,18 +1817,44 @@
         
         // Show user-friendly error message
         let errorMsg = 'Error loading wallet';
+        let isConfigError = false;
+        
         if (err.message) {
-          // Check if it's an encryption key error
-          if (err.message.includes('ENCRYPTION_KEY') || err.message.includes('encryption_key_error')) {
+          // Check for specific error types
+          if (err.message === 'SERVER_CONFIG_ERROR' || 
+              err.message.includes('ENCRYPTION_KEY') || 
+              err.message.includes('encryption_key_error') ||
+              err.message.includes('ENCRYPTION_KEY must be exactly 64')) {
             errorMsg = 'Server configuration error. Please contact support.';
-          } else if (err.message.includes('ENCRYPTION_KEY must be exactly 64')) {
-            errorMsg = 'Server configuration error. Please contact support.';
+            isConfigError = true;
+          } else if (err.message.includes('database_not_configured') || err.message.includes('Supabase not configured')) {
+            errorMsg = 'Database not configured. Please contact support.';
+            isConfigError = true;
+          } else if (err.message.includes('missing_user_id') || err.message.includes('telegram_id is required')) {
+            errorMsg = 'Unable to identify user. Please refresh the page.';
+          } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+            errorMsg = 'Network error. Please check your connection.';
           } else {
-            errorMsg = err.message.length > 50 ? err.message.substring(0, 50) + '...' : err.message;
+            // Show shortened error message
+            const shortMsg = err.message.length > 60 ? err.message.substring(0, 60) + '...' : err.message;
+            errorMsg = shortMsg;
           }
         }
         
-        if (statusEl) statusEl.textContent = errorMsg;
+        if (statusEl) {
+          statusEl.textContent = errorMsg;
+          if (isConfigError) {
+            statusEl.style.background = 'var(--red)';
+            statusEl.style.color = 'white';
+          } else {
+            statusEl.style.background = 'var(--accent)';
+            statusEl.style.color = 'white';
+          }
+        }
+        
+        // Log full error for debugging
+        console.error('Full wallet error:', err);
+        console.error('Error stack:', err.stack);
       }
     }
 
@@ -2157,8 +2198,8 @@
           const weekLabel = weekTag ? (typeof weekTag === 'string' ? weekTag : (weekTag.label || weekTag.slug || '')) : '';
           
           return `
-            <div class="event-group" data-event-id="${event.eventId}">
-              <div class="event-header" data-collapse-target="${event.eventId}">
+            <div class="event-group collapsed" data-event-id="${event.eventId}">
+              <div class="event-header collapsed" data-collapse-target="${event.eventId}">
                 ${hasImage ? `<img class="event-image" src="${eventImg}" alt="" onerror="this.classList.add('hidden')" />` : ''}
                 <div class="event-info">
                   <div class="event-title">

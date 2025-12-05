@@ -121,8 +121,20 @@ module.exports = async (req, res) => {
       const solanaAddress = solanaKeypair.publicKey.toBase58();
       const solanaSecretKey = Buffer.from(solanaKeypair.secretKey).toString('base64');
 
-      // Encrypt private keys
-      const encryptionKey = getEncryptionKey();
+      // Encrypt private keys (requires ENCRYPTION_KEY)
+      let encryptionKey;
+      try {
+        encryptionKey = getEncryptionKey();
+      } catch (encryptErr) {
+        console.error("[wallet] Encryption key error:", encryptErr);
+        return res.status(500).json({
+          error: "encryption_key_error",
+          message: encryptErr.message,
+          code: encryptErr.code,
+          help: "Generate a valid key with: openssl rand -hex 32"
+        });
+      }
+      
       const polygonSecretEnc = encrypt(polygonWallet.privateKey, encryptionKey);
       const solanaSecretEnc = encrypt(solanaSecretKey, encryptionKey);
 
@@ -201,26 +213,35 @@ module.exports = async (req, res) => {
       });
     } else {
       // Fallback: Generate wallets without Supabase (for development/testing)
+      // NOTE: This doesn't require encryption key since we're not storing anything
       console.log("[wallet] Supabase not configured, generating wallets without persistence");
       
-      // Generate Polygon wallet (Ethereum-compatible)
-      const polygonWallet = Wallet.createRandom();
-      
-      // Generate Solana wallet (valid keypair)
-      const solanaKeypair = Keypair.generate();
-      const solanaAddress = solanaKeypair.publicKey.toBase58();
+      try {
+        // Generate Polygon wallet (Ethereum-compatible)
+        const polygonWallet = Wallet.createRandom();
+        
+        // Generate Solana wallet (valid keypair)
+        const solanaKeypair = Keypair.generate();
+        const solanaAddress = solanaKeypair.publicKey.toBase58();
 
-      return res.status(200).json({
-        success: true,
-        wallet: {
-          solana: solanaAddress,
-          polygon: polygonWallet.address.toLowerCase(),
-          userId: normalizedUserId,
-          createdAt: new Date().toISOString(),
-        },
-        isNew: true,
-        warning: "Wallets generated without persistence. Configure Supabase for wallet persistence."
-      });
+        return res.status(200).json({
+          success: true,
+          wallet: {
+            solana: solanaAddress,
+            polygon: polygonWallet.address.toLowerCase(),
+            userId: normalizedUserId,
+            createdAt: new Date().toISOString(),
+          },
+          isNew: true,
+          warning: "Wallets generated without persistence. Configure Supabase for wallet persistence."
+        });
+      } catch (err) {
+        console.error("[wallet] Error generating wallets (fallback):", err);
+        return res.status(500).json({
+          error: "wallet_generation_failed",
+          message: err.message
+        });
+      }
     }
 
   } catch (err) {
