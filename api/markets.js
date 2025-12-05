@@ -169,6 +169,34 @@ module.exports = async (req, res) => {
       
       const searchTerms = sportVariations[kind.toLowerCase()] || [kind.toLowerCase()];
       
+      // Helper function to extract week number from text
+      function extractWeekNumber(text) {
+        if (!text) return null;
+        const weekMatch = text.match(/week\s*(\d+)/i);
+        return weekMatch ? parseInt(weekMatch[1], 10) : null;
+      }
+      
+      // Helper function to determine current NFL week (approximate)
+      // NFL season typically starts early September, 18 weeks regular season
+      function getCurrentNFLWeek() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        // NFL season typically starts first Thursday of September
+        // Approximate: September 5-12 is usually Week 1
+        const seasonStart = new Date(currentYear, 8, 5); // September 5
+        const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+        const week = Math.floor(daysSinceStart / 7) + 1;
+        // Clamp to reasonable range (1-18 for regular season, up to 22 for playoffs)
+        return Math.max(1, Math.min(22, week));
+      }
+      
+      // Get current week for filtering
+      const currentWeek = getCurrentNFLWeek();
+      const now = new Date();
+      const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      console.log("[markets] Current NFL week (estimated):", currentWeek);
+      
       // Strategy 1: Fetch events directly (this gives us game structure)
       try {
         // Reduce limit for faster initial load - we can fetch more if needed
@@ -224,6 +252,43 @@ module.exports = async (req, res) => {
               // Check for week indicators (common in NFL game events)
               const hasWeek = eventTitle.includes("week") || eventSlug.includes("week") || 
                             eventTags.some(tag => (tag.slug || tag.label || "").toLowerCase().includes("week"));
+              
+              // Extract week number from event
+              const eventWeek = extractWeekNumber(eventTitle) || 
+                               extractWeekNumber(eventSlug) ||
+                               (eventTags.find(tag => {
+                                 const tagText = (tag.slug || tag.label || "").toLowerCase();
+                                 return tagText.includes("week");
+                               }) ? extractWeekNumber(eventTags.find(tag => {
+                                 const tagText = (tag.slug || tag.label || "").toLowerCase();
+                                 return tagText.includes("week");
+                               }).slug || eventTags.find(tag => {
+                                 const tagText = (tag.slug || tag.label || "").toLowerCase();
+                                 return tagText.includes("week");
+                               }).label) : null);
+              
+              // Filter by current week - only include events from current week or within next week
+              if (isGamesOnly && eventWeek !== null) {
+                // Only include if week matches current week or is within 1 week ahead
+                if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
+                  continue; // Skip outdated or too-future games
+                }
+              }
+              
+              // Filter by event start date - only include current/future games
+              if (isGamesOnly && event.startDate) {
+                const eventStart = new Date(event.startDate);
+                // Skip games that started more than 24 hours ago (already played)
+                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                if (eventStart < oneDayAgo) {
+                  continue; // Skip games that already happened
+                }
+                // Also skip games more than 2 weeks in the future
+                const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+                if (eventStart > twoWeeksFromNow) {
+                  continue; // Skip games too far in the future
+                }
+              }
               
               // Check for game structure (vs, game indicators)
               const hasGameStructure = eventTitle.includes(" vs ") || eventTitle.includes(" v ") || 
@@ -536,6 +601,33 @@ module.exports = async (req, res) => {
                 
                 const hasWeek = eventTitle.includes('week') || eventSlug.includes('week') || eventTags.some(t => t.includes('week'));
                 const hasVs = eventTitle.includes(" vs ") || eventSlug.includes(" vs ") || eventTitle.includes(" v ");
+                
+                // Extract week number from event
+                const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug) ||
+                                 (eventTags.find(t => t.includes('week')) ? extractWeekNumber(eventTags.find(t => t.includes('week'))) : null);
+                
+                // Filter by current week - only include events from current week or within next week
+                if (eventWeek !== null) {
+                  // Only include if week matches current week or is within 1 week ahead
+                  if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
+                    continue; // Skip outdated or too-future games
+                  }
+                }
+                
+                // Filter by event start date - only include current/future games
+                if (event.startDate) {
+                  const eventStart = new Date(event.startDate);
+                  // Skip games that started more than 24 hours ago (already played)
+                  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                  if (eventStart < oneDayAgo) {
+                    continue; // Skip games that already happened
+                  }
+                  // Also skip games more than 2 weeks in the future
+                  const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+                  if (eventStart > twoWeeksFromNow) {
+                    continue; // Skip games too far in the future
+                  }
+                }
                 
                 // Check if markets look like games
                 const hasGameMarkets = event.markets.some(m => {
@@ -1026,6 +1118,56 @@ module.exports = async (req, res) => {
         return (hasEventInfo || looksLikeGame) && !isDefinitelyProp;
       });
       console.log("[markets] After games-only filter:", markets.length, "(removed", beforeFilter - markets.length, "non-game markets)");
+      
+      // Additional filter: Remove outdated games (past week or too far in future)
+      const beforeDateFilter = markets.length;
+      markets = markets.filter(m => {
+        // Check event start date if available
+        if (m.eventStartDate) {
+          const eventStart = new Date(m.eventStartDate);
+          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+          
+          // Skip games that already happened (more than 24 hours ago)
+          if (eventStart < oneDayAgo) {
+            return false;
+          }
+          // Skip games too far in the future (more than 2 weeks)
+          if (eventStart > twoWeeksFromNow) {
+            return false;
+          }
+        }
+        
+        // Check week number from event tags or title
+        const eventTitle = (m.eventTitle || "").toLowerCase();
+        const eventSlug = (m.eventSlug || "").toLowerCase();
+        const eventTags = m.eventTags || [];
+        
+        // Try to extract week from title or slug first
+        let eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug);
+        
+        // If not found, try extracting from tags
+        if (!eventWeek && eventTags.length > 0) {
+          for (const tag of eventTags) {
+            const tagText = typeof tag === 'string' ? tag : (tag.slug || tag.label || "");
+            if (tagText.toLowerCase().includes("week")) {
+              eventWeek = extractWeekNumber(tagText);
+              if (eventWeek) break;
+            }
+          }
+        }
+        
+        // If we have a week number, filter by current week
+        if (eventWeek !== null) {
+          // Only include if week matches current week or is within 1 week ahead
+          if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
+            return false; // Skip outdated or too-future games
+          }
+        }
+        
+        return true;
+      });
+      console.log("[markets] After date/week filter:", markets.length, "(removed", beforeDateFilter - markets.length, "outdated games)");
     }
 
     // Filter: must have valid prices
