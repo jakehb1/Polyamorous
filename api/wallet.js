@@ -72,34 +72,46 @@ module.exports = async (req, res) => {
     });
   }
 
+  // Normalize user ID to string and validate
+  const normalizedUserId = String(telegramId).trim();
+  if (!normalizedUserId || normalizedUserId.length === 0) {
+    return res.status(400).json({ 
+      error: "invalid_user_id", 
+      message: "telegram_id cannot be empty" 
+    });
+  }
+
+  console.log("[wallet] Processing request for Telegram user ID:", normalizedUserId);
+
   try {
     // If Supabase is configured, use it
     if (hasSupabase) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
       
-      // Check if wallet already exists
+      // Check if wallet already exists for this Telegram user
       const { data: existingWallet, error: fetchError } = await supabase
         .from("custody_wallets")
-        .select("polygon_address, solana_address, created_at")
-        .eq("user_id", String(telegramId))
+        .select("polygon_address, solana_address, created_at, user_id")
+        .eq("user_id", normalizedUserId)
         .single();
 
       if (existingWallet && !fetchError) {
-        console.log("[wallet] Found existing wallet for user:", telegramId);
+        console.log("[wallet] Found existing wallet for Telegram user:", normalizedUserId);
+        console.log("[wallet] Wallet addresses - Polygon:", existingWallet.polygon_address, "Solana:", existingWallet.solana_address);
         return res.status(200).json({
           success: true,
           wallet: {
             solana: existingWallet.solana_address,
             polygon: existingWallet.polygon_address,
-            userId: telegramId,
+            userId: normalizedUserId,
             createdAt: existingWallet.created_at,
           },
           isNew: false,
         });
       }
 
-      // Generate new wallets
-      console.log("[wallet] Creating new wallets for user:", telegramId);
+      // Generate new wallets for this Telegram user
+      console.log("[wallet] Creating new wallets for Telegram user:", normalizedUserId);
       
       // Generate Polygon wallet (Ethereum-compatible)
       const polygonWallet = Wallet.createRandom();
@@ -114,11 +126,11 @@ module.exports = async (req, res) => {
       const polygonSecretEnc = encrypt(polygonWallet.privateKey, encryptionKey);
       const solanaSecretEnc = encrypt(solanaSecretKey, encryptionKey);
 
-      // Save to Supabase
+      // Save to Supabase with Telegram user ID
       const { data: newWallet, error: insertError } = await supabase
         .from("custody_wallets")
         .insert({
-          user_id: String(telegramId),
+          user_id: normalizedUserId, // Store Telegram user ID
           polygon_address: polygonWallet.address.toLowerCase(),
           polygon_secret_enc: polygonSecretEnc,
           solana_address: solanaAddress,
@@ -126,19 +138,42 @@ module.exports = async (req, res) => {
           clob_registered: false,
           usdc_approved: false,
         })
-        .select("polygon_address, solana_address, created_at")
+        .select("polygon_address, solana_address, created_at, user_id")
         .single();
 
       if (insertError) {
         console.error("[wallet] Supabase insert error:", insertError);
+        // Check if it's a duplicate key error (user already has wallet)
+        if (insertError.code === '23505' || insertError.message.includes('duplicate') || insertError.message.includes('unique')) {
+          console.log("[wallet] Wallet already exists, fetching existing wallet");
+          // Try to fetch the existing wallet
+          const { data: existing } = await supabase
+            .from("custody_wallets")
+            .select("polygon_address, solana_address, created_at")
+            .eq("user_id", normalizedUserId)
+            .single();
+          
+          if (existing) {
+            return res.status(200).json({
+              success: true,
+              wallet: {
+                solana: existing.solana_address,
+                polygon: existing.polygon_address,
+                userId: normalizedUserId,
+                createdAt: existing.created_at,
+              },
+              isNew: false,
+            });
+          }
+        }
         throw new Error(`Failed to save wallet: ${insertError.message}`);
       }
 
-      // Initialize balance record
-      await supabase
+      // Initialize balance record for this Telegram user
+      const { error: balanceError } = await supabase
         .from("user_balances")
         .upsert({
-          user_id: String(telegramId),
+          user_id: normalizedUserId, // Store Telegram user ID
           usdc_available: 0,
           usdc_locked: 0,
           sol_balance: 0,
@@ -146,14 +181,20 @@ module.exports = async (req, res) => {
           onConflict: 'user_id'
         });
 
-      console.log("[wallet] Successfully created wallets for user:", telegramId);
+      if (balanceError) {
+        console.error("[wallet] Balance initialization error:", balanceError);
+        // Don't fail wallet creation if balance init fails
+      }
+
+      console.log("[wallet] Successfully created wallets for Telegram user:", normalizedUserId);
+      console.log("[wallet] Wallet addresses - Polygon:", newWallet.polygon_address, "Solana:", newWallet.solana_address);
 
       return res.status(200).json({
         success: true,
         wallet: {
           solana: newWallet.solana_address,
           polygon: newWallet.polygon_address,
-          userId: telegramId,
+          userId: normalizedUserId,
           createdAt: newWallet.created_at,
         },
         isNew: true,
@@ -174,7 +215,7 @@ module.exports = async (req, res) => {
         wallet: {
           solana: solanaAddress,
           polygon: polygonWallet.address.toLowerCase(),
-          userId: telegramId,
+          userId: normalizedUserId,
           createdAt: new Date().toISOString(),
         },
         isNew: true,

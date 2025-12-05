@@ -1547,11 +1547,34 @@
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-        state.telegramId = tg.initDataUnsafe?.user?.id || `demo_${Date.now()}`;
+        
+        // Get Telegram user ID - try multiple methods
+        const userId = tg.initDataUnsafe?.user?.id || 
+                      tg.initData?.user?.id ||
+                      tg.initDataUnsafe?.user_id ||
+                      null;
+        
+        if (userId) {
+          // Ensure it's a string and valid
+          state.telegramId = String(userId);
+          console.log('Telegram user ID:', state.telegramId);
+          console.log('Telegram user data:', tg.initDataUnsafe?.user);
+        } else {
+          // Fallback for testing/development
+          const demoId = localStorage.getItem('demo_telegram_id') || `demo_${Date.now()}`;
+          localStorage.setItem('demo_telegram_id', demoId);
+          state.telegramId = demoId;
+          console.warn('No Telegram user ID found, using demo ID:', state.telegramId);
+        }
       } else {
-        state.telegramId = `demo_${Date.now()}`;
+        // Fallback for non-Telegram environments
+        const demoId = localStorage.getItem('demo_telegram_id') || `demo_${Date.now()}`;
+        localStorage.setItem('demo_telegram_id', demoId);
+        state.telegramId = demoId;
+        console.warn('Not running in Telegram, using demo ID:', state.telegramId);
       }
-      console.log('Telegram ID:', state.telegramId);
+      
+      console.log('Final Telegram ID:', state.telegramId);
     }
 
     // =====================
