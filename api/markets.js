@@ -325,27 +325,23 @@ module.exports = async (req, res) => {
                                  return tagText.includes("week");
                                }).label) : null);
               
-              // Filter by current week - only include events from current week or within next week
+              // Filter by current week - show all games for current week (less strict)
               if (isGamesOnly && eventWeek !== null) {
-                // Only include if week matches current week or is within 1 week ahead
-                if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
-                  continue; // Skip outdated or too-future games
+                // Include if week matches current week or is within 2 weeks ahead (to catch upcoming games)
+                if (eventWeek < currentWeek - 2 || eventWeek > currentWeek + 2) {
+                  continue; // Skip games from past weeks or too far in future
                 }
               }
               
-              // Filter by event start date - only include current/future games
+              // Filter by event start date - only exclude games that are clearly in the past
               if (isGamesOnly && event.startDate) {
                 const eventStart = new Date(event.startDate);
-                // Skip games that started more than 24 hours ago (already played)
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                if (eventStart < oneDayAgo) {
+                // Only skip games that started more than 48 hours ago (give buffer for recent games)
+                const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+                if (eventStart < twoDaysAgo) {
                   continue; // Skip games that already happened
                 }
-                // Also skip games more than 2 weeks in the future
-                const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-                if (eventStart > twoWeeksFromNow) {
-                  continue; // Skip games too far in the future
-                }
+                // Don't filter future games - show all upcoming games
               }
               
               // Check for game structure (vs, game indicators)
@@ -403,69 +399,27 @@ module.exports = async (req, res) => {
                 // Extract all markets from this event (game)
                   for (const market of event.markets) {
                   if (!market.closed && market.active !== false) {
-                    // For games only, ONLY include markets that look like actual games
+                    // For games only, exclude only clearly prop markets (be more permissive)
                     if (isGamesOnly) {
                       const question = (market.question || "").toLowerCase();
                       const slug = (market.slug || "").toLowerCase();
                       
-                      // WHITELIST: Only include markets with clear game indicators
-                      const hasGameIndicator = 
-                        question.includes(" vs ") ||
-                        question.includes(" v ") ||
-                        question.includes("moneyline") ||
-                        question.includes("spread") ||
-                        question.includes("total") ||
-                        question.includes("o/u") ||
-                        question.includes("over/under") ||
-                        question.includes("over ") ||
-                        question.includes("under ") ||
-                        slug.includes("moneyline") ||
-                        slug.includes("spread") ||
-                        slug.includes("total") ||
-                        slug.includes("o/u") ||
-                        slug.includes("over-under");
-                      
-                      // BLACKLIST: Exclude all prop markets
-                      // "Will" questions are props UNLESS they're about a team winning a specific game (which would have game indicators)
-                      const isWillQuestion = question.includes("will ");
-                      const isPlayerProp = isWillQuestion && (
-                        question.includes("rookie of the year") ||
-                        question.includes("offensive rookie") ||
-                        question.includes("defensive rookie") ||
-                        question.includes("offensive player of the year") ||
-                        question.includes("defensive player of the year") ||
-                        question.includes("mvp") ||
-                        question.includes("leader") ||
-                        question.includes("award") ||
-                        question.includes("champion") ||
-                        question.includes("be the") || // "Will X be the Y" is usually a prop
-                        question.includes("in 2025") || // Season-long predictions
-                        question.includes("in 2026") ||
-                        question.includes("2025-2026") ||
-                        question.includes("2026-2027")
-                      );
-                      
+                      // BLACKLIST: Only exclude clearly prop markets (season-long awards, MVP, etc.)
                       const isDefinitelyProp = 
-                        isPlayerProp ||
-                        (!hasGameIndicator && isWillQuestion) || // "Will" without game indicators is a prop
                         question.includes("rookie of the year") ||
                         question.includes("offensive rookie") ||
                         question.includes("defensive rookie") ||
                         question.includes("offensive player of the year") ||
                         question.includes("defensive player of the year") ||
-                        question.includes("mvp") ||
-                        question.includes("leader") ||
-                        question.includes("award") ||
+                        question.includes("mvp") && !question.includes("vs") && !question.includes("week") ||
+                        question.includes("leader") && !question.includes("vs") && !question.includes("week") ||
+                        question.includes("award") && !question.includes("vs") ||
                         (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
                         (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
-                        (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
-                        slug.includes("prop") ||
-                        slug.includes("rookie") ||
-                        slug.includes("mvp") ||
-                        slug.includes("leader");
+                        slug.includes("prop") && (slug.includes("mvp") || slug.includes("leader") || slug.includes("rookie"));
                       
-                      // Only include if it has game indicators AND is not a prop
-                      if (!hasGameIndicator || isDefinitelyProp) {
+                      // Include all markets from game events except clearly props
+                      if (isDefinitelyProp) {
                         continue;
                       }
                     }
@@ -664,27 +618,23 @@ module.exports = async (req, res) => {
                 const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug) ||
                                  (eventTags.find(t => t.includes('week')) ? extractWeekNumber(eventTags.find(t => t.includes('week'))) : null);
                 
-                // Filter by current week - only include events from current week or within next week
+                // Filter by current week - show all games for current week (less strict)
                 if (eventWeek !== null) {
-                  // Only include if week matches current week or is within 1 week ahead
-                  if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
-                    continue; // Skip outdated or too-future games
+                  // Include if week matches current week or is within 2 weeks ahead
+                  if (eventWeek < currentWeek - 2 || eventWeek > currentWeek + 2) {
+                    continue; // Skip games from past weeks or too far in future
                   }
                 }
                 
-                // Filter by event start date - only include current/future games
+                // Filter by event start date - only exclude games that are clearly in the past
                 if (event.startDate) {
                   const eventStart = new Date(event.startDate);
-                  // Skip games that started more than 24 hours ago (already played)
-                  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                  if (eventStart < oneDayAgo) {
+                  // Only skip games that started more than 48 hours ago (give buffer for recent games)
+                  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+                  if (eventStart < twoDaysAgo) {
                     continue; // Skip games that already happened
                   }
-                  // Also skip games more than 2 weeks in the future
-                  const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-                  if (eventStart > twoWeeksFromNow) {
-                    continue; // Skip games too far in the future
-                  }
+                  // Don't filter future games - show all upcoming games
                 }
                 
                 // Check if markets look like games
@@ -712,46 +662,21 @@ module.exports = async (req, res) => {
                         const question = (market.question || "").toLowerCase();
                         const slug = (market.slug || "").toLowerCase();
                         
-                        // BLACKLIST: Exclude all prop markets
-                        const isWillQuestion = question.includes("will ");
-                        const isPlayerProp = isWillQuestion && (
-                          question.includes("rookie of the year") ||
-                          question.includes("offensive rookie") ||
-                          question.includes("defensive rookie") ||
-                          question.includes("offensive player of the year") ||
-                          question.includes("defensive player of the year") ||
-                          question.includes("mvp") ||
-                          question.includes("leader") ||
-                          question.includes("award") ||
-                          question.includes("champion") ||
-                          question.includes("be the") ||
-                          question.includes("in 2025") ||
-                          question.includes("in 2026") ||
-                          question.includes("2025-2026") ||
-                          question.includes("2026-2027")
-                        );
-                        
+                        // BLACKLIST: Only exclude clearly prop markets (be more permissive)
                         const isDefinitelyProp = 
-                          isPlayerProp ||
-                          (!hasGameMarkets && !hasVs && isWillQuestion) || // "Will" questions in non-game events are props
                           question.includes("rookie of the year") ||
                           question.includes("offensive rookie") ||
                           question.includes("defensive rookie") ||
                           question.includes("offensive player of the year") ||
                           question.includes("defensive player of the year") ||
-                          question.includes("mvp") ||
-                          question.includes("leader") ||
-                          question.includes("award") ||
+                          (question.includes("mvp") && !question.includes("vs") && !question.includes("week")) ||
+                          (question.includes("leader") && !question.includes("vs") && !question.includes("week")) ||
+                          (question.includes("award") && !question.includes("vs")) ||
                           (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
                           (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
-                          (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
-                          slug.includes("prop") ||
-                          slug.includes("rookie") ||
-                          slug.includes("mvp") ||
-                          slug.includes("leader");
+                          (slug.includes("prop") && (slug.includes("mvp") || slug.includes("leader") || slug.includes("rookie")));
                         
-                        // Include all markets from game events that aren't props
-                        // This allows team-name markets (e.g., "DAL", "DET", "Cowboys", "Lions") to be included
+                        // Include all markets from game events except clearly props
                         if (!isDefinitelyProp) {
                           const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
                           if (!existing) {
@@ -1199,9 +1124,9 @@ module.exports = async (req, res) => {
           question.includes("2026-2027") ||
           question.includes("be the"); // "Will X be the Y" is usually a prop
         
-        // STRICT: Only include if it has event info AND looks like a game AND is not a prop
-        // For games, we require BOTH event info AND game indicators (no standalone markets)
-        return hasEventInfo && looksLikeGame && !isDefinitelyProp;
+        // For games: Include if it has event info OR looks like a game (be more permissive)
+        // Polymarket shows all markets from game events, so we should too
+        return (hasEventInfo || looksLikeGame) && !isDefinitelyProp;
       });
       console.log("[markets] After games-only filter:", markets.length, "(removed", beforeFilter - markets.length, "non-game markets)");
       
@@ -1243,11 +1168,11 @@ module.exports = async (req, res) => {
           }
         }
         
-        // If we have a week number, filter by current week
+        // If we have a week number, filter by current week (less strict)
         if (eventWeek !== null) {
-          // Only include if week matches current week or is within 1 week ahead
-          if (eventWeek < currentWeek - 1 || eventWeek > currentWeek + 1) {
-            return false; // Skip outdated or too-future games
+          // Include if week matches current week or is within 2 weeks ahead
+          if (eventWeek < currentWeek - 2 || eventWeek > currentWeek + 2) {
+            return false; // Skip games from past weeks or too far in future
           }
         }
         
