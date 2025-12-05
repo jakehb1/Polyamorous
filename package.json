@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Telegram Mini App for Polymarket trading",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "test": "node test-setup.js",
+    "test:local": "TEST_URL=http://localhost:3000 node test-setup.js",
+    "test:prod": "TEST_URL=https://your-app.vercel.app node test-setup.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
