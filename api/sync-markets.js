@@ -225,6 +225,46 @@ async function syncCategory(supabase, category, tagId, fullSync = false) {
             console.error(`[sync-markets] Error upserting market ${market.id}:`, marketError);
           } else {
             marketsSynced++;
+            
+            // Track price history for this market
+            try {
+              const outcomes = market.outcomes || ["Yes", "No"];
+              const prices = market.outcomePrices || [];
+              const priceHistoryRecords = [];
+              
+              outcomes.forEach((outcome, index) => {
+                const price = prices[index] !== undefined ? parseFloat(prices[index]) : null;
+                if (price !== null && !isNaN(price)) {
+                  priceHistoryRecords.push({
+                    market_id: String(market.id || market.conditionId),
+                    condition_id: market.conditionId ? String(market.conditionId) : null,
+                    outcome_index: index,
+                    outcome_name: outcome,
+                    price: price,
+                    volume: parseFloat(market.volume24hr) || parseFloat(market.volume) || 0,
+                    liquidity: parseFloat(market.liquidity) || 0,
+                    timestamp: new Date().toISOString()
+                  });
+                }
+              });
+              
+              // Insert price history records (upsert to avoid duplicates if sync runs multiple times per minute)
+              if (priceHistoryRecords.length > 0) {
+                const { error: historyError } = await supabase
+                  .from('market_price_history')
+                  .upsert(priceHistoryRecords, { 
+                    onConflict: 'market_price_history_market_outcome_idx',
+                    ignoreDuplicates: false // Update if exists (to refresh price)
+                  });
+                
+                if (historyError) {
+                  console.error(`[sync-markets] Error tracking price history for market ${market.id}:`, historyError);
+                }
+              }
+            } catch (historyErr) {
+              console.error(`[sync-markets] Error in price history tracking:`, historyErr.message);
+              // Don't fail the whole sync if price history fails
+            }
           }
         }
       }

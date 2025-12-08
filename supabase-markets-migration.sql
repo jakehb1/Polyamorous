@@ -190,6 +190,57 @@ CREATE TRIGGER update_categories_updated_at
 -- Grant permissions
 GRANT ALL ON categories TO service_role;
 
+-- Market Price History table - tracks price changes over time
+CREATE TABLE IF NOT EXISTS market_price_history (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  market_id text NOT NULL,
+  condition_id text,
+  outcome_index integer NOT NULL,
+  outcome_name text,
+  price numeric NOT NULL,
+  volume numeric DEFAULT 0,
+  liquidity numeric DEFAULT 0,
+  timestamp timestamptz DEFAULT now(),
+  
+  -- Indexes for fast queries
+  CONSTRAINT market_price_history_market_outcome_idx UNIQUE (market_id, outcome_index, timestamp)
+);
+
+-- Indexes for price history
+CREATE INDEX IF NOT EXISTS market_price_history_market_id_idx ON market_price_history(market_id);
+CREATE INDEX IF NOT EXISTS market_price_history_timestamp_idx ON market_price_history(timestamp DESC);
+CREATE INDEX IF NOT EXISTS market_price_history_market_timestamp_idx ON market_price_history(market_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS market_price_history_outcome_idx ON market_price_history(market_id, outcome_index, timestamp DESC);
+
+-- Enable RLS
+ALTER TABLE market_price_history ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy
+DROP POLICY IF EXISTS "Service role full access market_price_history" ON market_price_history;
+CREATE POLICY "Service role full access market_price_history"
+  ON market_price_history FOR ALL
+  USING (
+    current_setting('request.jwt.claims', true)::json->>'role' = 'service_role' OR
+    current_setting('request.jwt.claims', true)::json IS NULL
+  )
+  WITH CHECK (
+    current_setting('request.jwt.claims', true)::json->>'role' = 'service_role' OR
+    current_setting('request.jwt.claims', true)::json IS NULL
+  );
+
+-- Auto-cleanup: Delete price history older than 90 days (optional, can be adjusted)
+-- This prevents the table from growing indefinitely
+CREATE OR REPLACE FUNCTION cleanup_old_price_history()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM market_price_history
+  WHERE timestamp < now() - INTERVAL '90 days';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant permissions
+GRANT ALL ON market_price_history TO service_role;
+
 -- Success message
-SELECT 'Markets and categories tables created successfully!' AS status;
+SELECT 'Markets, categories, and price history tables created successfully!' AS status;
 
