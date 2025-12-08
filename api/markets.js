@@ -219,21 +219,30 @@ module.exports = async (req, res) => {
           console.log("[markets] Found", uniqueEvents.length, "unique events");
           
           // Filter events by category tag IDs - check both string and number format
+          // Normalize tag IDs to numbers for consistent comparison
+          const normalizedTagIds = tagIdsToUse.map(id => Number(id));
           const categoryEvents = uniqueEvents.filter(event => {
             const eventTags = event.tags || [];
             // Check if event has any of our category tag IDs (handle both string and number)
             return eventTags.some(tag => {
               const tagId = typeof tag === 'object' ? tag.id : tag;
-              // Compare as both string and number to handle format differences
-              return tagIdsToUse.some(targetId => 
-                tagId === targetId || 
-                String(tagId) === String(targetId) ||
-                Number(tagId) === Number(targetId)
-              );
+              const normalizedTagId = Number(tagId);
+              // Compare normalized numbers
+              return normalizedTagIds.includes(normalizedTagId);
             });
           });
           
-          console.log("[markets] Found", categoryEvents.length, "events matching category tags");
+          console.log("[markets] Found", categoryEvents.length, "events matching category tags", tagIdsToUse);
+          
+          // Debug: Show sample of events if we found some
+          if (categoryEvents.length > 0 && categoryEvents.length < 5) {
+            console.log("[markets] Sample category events:", categoryEvents.map(e => ({
+              id: e.id,
+              title: e.title?.substring(0, 50),
+              tags: e.tags?.map(t => typeof t === 'object' ? t.id : t),
+              markets: e.markets?.length || 0
+            })));
+          }
           
           // Extract all markets from category events
           for (const event of categoryEvents) {
@@ -278,16 +287,14 @@ module.exports = async (req, res) => {
           if (eventsResp.ok) {
             const events = await eventsResp.json();
             if (Array.isArray(events)) {
+              // Normalize tag IDs for comparison
+              const normalizedTagIds = tagIdsToUse.map(id => Number(id));
               const categoryEvents = events.filter(event => {
                 const eventTags = event.tags || [];
                 return eventTags.some(tag => {
                   const tagId = typeof tag === 'object' ? tag.id : tag;
-                  // Compare as both string and number to handle format differences
-                  return tagIdsToUse.some(targetId => 
-                    tagId === targetId || 
-                    String(tagId) === String(targetId) ||
-                    Number(tagId) === Number(targetId)
-                  );
+                  const normalizedTagId = Number(tagId);
+                  return normalizedTagIds.includes(normalizedTagId);
                 });
               });
               
