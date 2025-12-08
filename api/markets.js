@@ -107,10 +107,31 @@ module.exports = async (req, res) => {
           const tags = await tagsResp.json();
           if (Array.isArray(tags)) {
             // Find all tags matching the category (exact match or contains)
+            // Also check for common variations (e.g., "politics" might be "political")
             const categoryTags = tags.filter(tag => {
               const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
               const kindLower = kind.toLowerCase();
-              return slug === kindLower || slug.includes(kindLower) || kindLower.includes(slug);
+              
+              // Exact match
+              if (slug === kindLower) return true;
+              
+              // Contains match
+              if (slug.includes(kindLower) || kindLower.includes(slug)) return true;
+              
+              // Common variations
+              const variations = {
+                'politics': ['political', 'politic', 'election', 'elections'],
+                'finance': ['financial', 'economy', 'economic'],
+                'crypto': ['cryptocurrency', 'cryptocurrencies', 'bitcoin', 'ethereum'],
+                'tech': ['technology', 'technological'],
+                'geopolitics': ['geopolitical', 'world', 'international']
+              };
+              
+              if (variations[kindLower]) {
+                return variations[kindLower].some(v => slug.includes(v) || v.includes(slug));
+              }
+              
+              return false;
             });
             
             categoryTagIds = categoryTags.map(tag => tag.id).filter(id => id);
@@ -129,8 +150,8 @@ module.exports = async (req, res) => {
         // Fetch from all tag IDs in parallel for faster loading
         const marketPromises = tagIdsToUse.map(async (tagId) => {
           try {
-            // Use minVolume parameter if Gamma API supports it, otherwise filter after
-            const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000&minVolume=${minVolumeNum}`;
+            // Fetch markets - filter by volume after fetching (Gamma API may not support minVolume param)
+            const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000`;
             const resp = await fetch(url);
             if (resp.ok) {
               const data = await resp.json();
@@ -203,21 +224,52 @@ module.exports = async (req, res) => {
         console.log("[markets] Error fetching events for category:", e.message);
       }
       
-      // Strategy 3: Fallback - fetch all markets and filter by tag (if we have tag IDs)
-      if (markets.length === 0 && categoryTagIds.length > 0) {
+      // Strategy 3: Fallback - fetch all markets and filter by tag or text matching
+      if (markets.length === 0) {
         try {
-          const url = `${GAMMA_API}/markets?closed=false&limit=5000&minVolume=${minVolumeNum}`;
+          console.log("[markets] No markets found via tag IDs, trying fallback search...");
+          const url = `${GAMMA_API}/markets?closed=false&limit=5000`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
             if (Array.isArray(data)) {
               const categoryMarkets = data.filter(m => {
                 if (m.closed || m.active === false) return false;
-                // Check if market has matching tag_id
-                const marketTags = m.tags || m.tagIds || [];
-                return (Array.isArray(marketTags) && marketTags.some(tagId => categoryTagIds.includes(tagId))) ||
-                       categoryTagIds.includes(m.tagId) || 
-                       categoryTagIds.includes(m.tag_id);
+                
+                // If we have tag IDs, check for tag matches
+                if (categoryTagIds.length > 0) {
+                  const marketTags = m.tags || m.tagIds || [];
+                  const hasTagMatch = (Array.isArray(marketTags) && marketTags.some(tagId => categoryTagIds.includes(tagId))) ||
+                                     categoryTagIds.includes(m.tagId) || 
+                                     categoryTagIds.includes(m.tag_id);
+                  if (hasTagMatch) return true;
+                }
+                
+                // Also check market question/slug for category keywords
+                const question = (m.question || "").toLowerCase();
+                const slug = (m.slug || "").toLowerCase();
+                const kindLower = kind.toLowerCase();
+                
+                // Check if market text contains category keyword
+                if (question.includes(kindLower) || slug.includes(kindLower)) {
+                  return true;
+                }
+                
+                // Check for common category keywords
+                const categoryKeywords = {
+                  'politics': ['election', 'president', 'senate', 'congress', 'trump', 'biden', 'democrat', 'republican', 'vote', 'voting'],
+                  'finance': ['fed', 'federal reserve', 'interest rate', 'inflation', 'gdp', 'stock', 'market', 'trading'],
+                  'crypto': ['bitcoin', 'ethereum', 'solana', 'crypto', 'blockchain', 'defi', 'nft'],
+                  'tech': ['apple', 'google', 'microsoft', 'meta', 'ai', 'artificial intelligence', 'tech', 'technology']
+                };
+                
+                if (categoryKeywords[kindLower]) {
+                  return categoryKeywords[kindLower].some(keyword => 
+                    question.includes(keyword) || slug.includes(keyword)
+                  );
+                }
+                
+                return false;
               });
               markets.push(...categoryMarkets);
               console.log("[markets] Added", categoryMarkets.length, "markets from fallback search");
@@ -226,6 +278,14 @@ module.exports = async (req, res) => {
         } catch (e) {
           console.log("[markets] Error in fallback market search:", e.message);
         }
+      }
+      
+      // Log what we found
+      if (markets.length === 0) {
+        console.log("[markets] WARNING: No markets found for category:", kind);
+        console.log("[markets] Tag IDs searched:", categoryTagIds);
+      } else {
+        console.log("[markets] Successfully found", markets.length, "markets for category:", kind);
       }
       
     } else if (isSportsSubcategory) {
@@ -713,7 +773,7 @@ module.exports = async (req, res) => {
           const nflTagIds = [1, 450, 100639];
           console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
           for (const tagId of nflTagIds) {
-            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000&minVolume=${minVolumeNum}`;
+            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000`;
             const tagMarketsResp = await fetch(tagMarketsUrl);
             if (tagMarketsResp.ok) {
               const tagMarkets = await tagMarketsResp.json();
@@ -738,7 +798,7 @@ module.exports = async (req, res) => {
         
         // Approach 3: Search all markets for game structure
         try {
-          const url = `${GAMMA_API}/markets?closed=false&limit=10000&minVolume=${minVolumeNum}`;
+          const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
@@ -1005,7 +1065,7 @@ module.exports = async (req, res) => {
       // This ensures we get a comprehensive 1:1 match with Polymarket
       try {
         // Fetch all active markets with high limit
-        const url = `${GAMMA_API}/markets?closed=false&limit=10000&minVolume=${minVolumeNum}`;
+        const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
       const resp = await fetch(url);
       if (resp.ok) {
         const data = await resp.json();
