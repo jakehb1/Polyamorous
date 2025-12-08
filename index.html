@@ -1479,7 +1479,7 @@
     }
     .time-selector.active {
       background: var(--accent);
-      color: white;
+      color: #EAF5FB;
       border-color: var(--accent);
     }
     .market-detail-selected-outcome {
@@ -2610,7 +2610,7 @@
       } catch (err) {
         console.error('[fetchMarkets] Error:', err);
         list.innerHTML = `
-          <div class="loading" style="color:#ef4444;">
+          <div class="loading" style="color:#d97777;">
             Failed to load markets<br>
             <small style="color:var(--text-muted)">${err.message}</small>
           </div>
