@@ -838,6 +838,7 @@
     }
     .event-header {
       display: flex;
+      align-items: center;
       gap: 12px;
       padding: 14px;
       border-bottom: 1px solid var(--border);
@@ -851,8 +852,38 @@
     .event-header.collapsed {
       border-bottom: none;
     }
-    .event-collapse-icon {
+    .event-info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .event-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      word-break: break-word;
+    }
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .event-primary-prices {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
       margin-left: auto;
+      margin-right: 8px;
+    }
+    .event-collapse-icon {
       font-size: 18px;
       color: var(--text-muted);
       transition: transform 0.2s;
@@ -865,12 +896,6 @@
     }
     .event-header.collapsed .event-collapse-icon {
       transform: rotate(-90deg);
-    }
-    .event-primary-prices {
-      display: flex;
-      gap: 8px;
-      margin-left: auto;
-      margin-right: 8px;
     }
     .event-price-btn {
       padding: 8px 16px;
@@ -915,21 +940,6 @@
     .event-image.hidden {
       display: none;
     }
-    .event-info {
-      flex: 1;
-      min-width: 0;
-    }
-    .event-title {
-      font-size: 15px;
-      font-weight: 600;
-      line-height: 1.4;
-      margin-bottom: 6px;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
     .week-tag {
       background: var(--bg-secondary);
       color: var(--text-muted);
@@ -938,13 +948,7 @@
       font-size: 11px;
       font-weight: 500;
       text-transform: uppercase;
-    }
-    .event-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 12px;
-      color: var(--text-muted);
+      flex-shrink: 0;
     }
     .event-markets {
       padding: 0;
@@ -2222,8 +2226,15 @@
           eventsMap.get(eventId).markets.push(m);
         });
         
+        // Sort events by volume (highest first) before rendering
+        const sortedEvents = Array.from(eventsMap.values()).sort((a, b) => {
+          const volA = a.eventVolume || a.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
+          const volB = b.eventVolume || b.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
+          return volB - volA;
+        });
+        
         // Render events with their markets
-        list.innerHTML = Array.from(eventsMap.values()).map(event => {
+        list.innerHTML = sortedEvents.map(event => {
           const eventVol = event.eventVolume || 
                           event.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
           const eventImg = event.eventImage || event.markets[0]?.image || '';
