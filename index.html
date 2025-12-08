@@ -2992,6 +2992,15 @@
           const resp = await fetch(`/api/market-history?marketId=${marketId}&range=${range}`);
           if (resp.ok) {
             const data = await resp.json();
+            // Store current prices from API response for graph
+            if (data.currentPrices && Array.isArray(data.currentPrices)) {
+              // Update prices array to match API response
+              data.currentPrices.forEach((price, idx) => {
+                if (prices[idx] !== undefined) {
+                  prices[idx] = price;
+                }
+              });
+            }
             return data.history || null;
           } else {
             console.log("[market-detail] Historical data API failed, using mock data");
@@ -3013,6 +3022,9 @@
         }
         
         ctx.clearRect(0, 0, width, height);
+        
+        // Get current market prices (these are the "now" values)
+        const currentPrices = prices.map(p => parseFloat(p) || 0);
         
         // Draw grid
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -3042,37 +3054,76 @@
           historyData.forEach((outcomeHistory, index) => {
             const color = colors[index % colors.length];
             const dataPoints = outcomeHistory.data || [];
+            const currentPrice = currentPrices[index] || 0;
             
-            if (dataPoints.length === 0) return;
+            if (dataPoints.length === 0) {
+              // No history, draw flat line at current price
+              const y = height - (currentPrice * height);
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(0, y);
+              ctx.lineTo(width, y);
+              ctx.stroke();
+              return;
+            }
             
             // Find min/max timestamps for scaling
             const timestamps = dataPoints.map(p => p.timestamp);
             const minTime = Math.min(...timestamps);
             const maxTime = Math.max(...timestamps);
-            const timeRange = maxTime - minTime;
+            const timeRange = maxTime - minTime || 1; // Avoid division by zero
+            
+            // Ensure the graph ends at current price (rightmost point)
+            const now = Date.now();
+            const historicalPoints = [...dataPoints];
+            
+            // Add current price as the final point (rightmost)
+            historicalPoints.push({
+              timestamp: now,
+              price: currentPrice,
+              volume: 0,
+              liquidity: 0
+            });
             
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.beginPath();
             
-            dataPoints.forEach((point, i) => {
-              const x = ((point.timestamp - minTime) / timeRange) * width;
+            historicalPoints.forEach((point, i) => {
+              // Scale X: 0 to width, with current time at the right edge
+              const x = timeRange > 0 
+                ? ((point.timestamp - minTime) / (now - minTime)) * width
+                : width; // If no time range, put at end
+              
+              // Scale Y: price (0-1) to canvas height (0 at top, 100% at bottom)
               const y = height - (point.price * height);
               
+              // Clamp to canvas bounds
+              const clampedX = Math.max(0, Math.min(width, x));
+              const clampedY = Math.max(0, Math.min(height, y));
+              
               if (i === 0) {
-                ctx.moveTo(x, y);
+                ctx.moveTo(clampedX, clampedY);
               } else {
-                ctx.lineTo(x, y);
+                ctx.lineTo(clampedX, clampedY);
               }
             });
             
             ctx.stroke();
+            
+            // Draw current price indicator (rightmost point)
+            const currentY = height - (currentPrice * height);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(width, currentY, 4, 0, Math.PI * 2);
+            ctx.fill();
           });
         } else {
-          // Fallback to mock data if API fails
+          // Fallback: Draw lines that end at current market prices
           outcomes.forEach((outcome, index) => {
             const color = colors[index % colors.length];
-            const basePrice = prices[index] !== undefined ? parseFloat(prices[index]) : 0.5;
+            const currentPrice = currentPrices[index] || 0.5;
             
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
@@ -3081,10 +3132,16 @@
             const points = 100;
             for (let i = 0; i < points; i++) {
               const x = (width / points) * i;
-              // Simulate price movement around base price
-              const variation = (Math.sin(i / 10) * 0.1) + (Math.random() * 0.05 - 0.025);
-              const price = Math.max(0.01, Math.min(0.99, basePrice + variation));
-              const y = height - (price * height);
+              // Simulate price movement that trends toward current price
+              const progress = i / points;
+              // Start from a reasonable baseline (around 0.5 or opposite of current)
+              const startPrice = index === 0 ? 0.5 : (1 - currentPrice);
+              // Interpolate from start to current price
+              const price = startPrice + (currentPrice - startPrice) * progress;
+              // Add some realistic variation
+              const variation = (Math.sin(i / 10) * 0.05) * (1 - progress); // Less variation near end
+              const finalPrice = Math.max(0.01, Math.min(0.99, price + variation));
+              const y = height - (finalPrice * height);
               
               if (i === 0) {
                 ctx.moveTo(x, y);
@@ -3094,8 +3151,29 @@
             }
             
             ctx.stroke();
+            
+            // Draw current price indicator (rightmost point)
+            const currentY = height - (currentPrice * height);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(width, currentY, 4, 0, Math.PI * 2);
+            ctx.fill();
           });
         }
+        
+        // Draw current price labels on right side
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'right';
+        outcomes.forEach((outcome, index) => {
+          const currentPrice = currentPrices[index] || 0;
+          const percent = (currentPrice * 100).toFixed(0);
+          const y = height - (currentPrice * height);
+          // Offset label slightly above/below the point
+          const labelY = index % 2 === 0 ? y - 8 : y + 16;
+          ctx.fillText(`${percent}%`, width - 4, labelY);
+        });
+        ctx.textAlign = 'left'; // Reset alignment
       }
       
       // Time range selector handlers

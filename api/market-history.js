@@ -123,19 +123,29 @@ module.exports = async (req, res) => {
             outcomes = market.outcomes || ["Yes", "No"];
             currentPrices = market.outcomePrices || [];
             
-            // Generate simulated historical data based on current price
+            // Generate simulated historical data that ends at current price
             const points = 100;
             history = outcomes.map((outcome, index) => {
               const currentPrice = currentPrices[index] !== undefined ? parseFloat(currentPrices[index]) : 0.5;
               const dataPoints = [];
               
+              // Calculate starting price (opposite or neutral)
+              const startPrice = outcomes.length === 2 && index === 1 
+                ? 1 - currentPrice 
+                : 0.5; // Start from 50% for multi-outcome markets
+              
               for (let i = 0; i < points; i++) {
                 const timestamp = startTime.getTime() + (timeRange / points) * i;
-                // Simulate price movement that trends toward current price
+                // Interpolate from start price to current price
                 const progress = i / points;
-                const baseVariation = (Math.sin(progress * Math.PI * 4) * 0.1) + (Math.random() * 0.05 - 0.025);
-                const trend = (currentPrice - 0.5) * progress;
-                const price = Math.max(0.01, Math.min(0.99, 0.5 + trend + baseVariation));
+                const interpolatedPrice = startPrice + (currentPrice - startPrice) * progress;
+                
+                // Add realistic variation (less near the end)
+                const variationAmount = 0.1 * (1 - progress); // Less variation as we approach current
+                const variation = (Math.sin(progress * Math.PI * 4) * variationAmount) + 
+                                 (Math.random() * variationAmount * 0.5 - variationAmount * 0.25);
+                
+                const price = Math.max(0.01, Math.min(0.99, interpolatedPrice + variation));
                 
                 dataPoints.push({
                   timestamp,
@@ -143,6 +153,11 @@ module.exports = async (req, res) => {
                   volume: 0,
                   liquidity: 0
                 });
+              }
+              
+              // Ensure last point is exactly current price
+              if (dataPoints.length > 0) {
+                dataPoints[dataPoints.length - 1].price = currentPrice;
               }
               
               return {
