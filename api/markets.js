@@ -1,10 +1,24 @@
 // api/markets.js
-// Fetches live markets from Polymarket Gamma API
-// Fetches markets from all categories using /tags endpoint
+// Fetches markets from Supabase database (mimics Polymarket architecture)
+// Falls back to Polymarket Gamma API if database is not configured or empty
 
 // Simple in-memory cache with TTL (5 seconds for fast updates)
 const cache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
+
+// Category tag IDs (verified from Polymarket events)
+const CATEGORY_TAG_IDS = {
+  'politics': 2,
+  'finance': 120,
+  'crypto': 21,
+  'sports': 1,
+  'tech': 1401,
+  'geopolitics': 100265,
+  'culture': 596,
+  'world': 101970,
+  'economy': 100328,
+  'elections': 377,
+};
 
 function getCacheKey(kind, sportType) {
   return `${kind}_${sportType || 'all'}`;
@@ -93,6 +107,242 @@ module.exports = async (req, res) => {
     // Check if this is a sports subcategory - only NFL for now
     const sportsSubcategories = ["nfl"];
     const isSportsSubcategory = sportsSubcategories.includes(kind.toLowerCase());
+    
+    // Try to fetch from Supabase database first (mimics Polymarket architecture)
+    let useDatabase = false;
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+      try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+        
+        // Check if we have markets in database (synced within last 5 minutes)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        
+        if (isCategory && !isSportsSubcategory) {
+          // Fetch from database by category
+          const categoryTagId = CATEGORY_TAG_IDS[kind.toLowerCase()];
+          if (categoryTagId) {
+            const { data: dbMarkets, error } = await supabase
+              .from('markets')
+              .select('*')
+              .eq('category', kind.toLowerCase())
+              .eq('active', true)
+              .eq('closed', false)
+              .gte('synced_at', fiveMinutesAgo)
+              .order('volume_24hr', { ascending: false })
+              .limit(limitNum);
+            
+            if (!error && dbMarkets && dbMarkets.length > 0) {
+              console.log(`[markets] Serving ${dbMarkets.length} markets from database for ${kind}`);
+              // Transform database format to API format
+              markets = dbMarkets.map(m => ({
+                id: m.id,
+                conditionId: m.condition_id,
+                question: m.question,
+                slug: m.slug,
+                description: m.description,
+                image: m.image,
+                icon: m.icon,
+                outcomes: m.outcomes || [],
+                outcomePrices: m.outcome_prices || [],
+                volume: m.volume,
+                volume24hr: m.volume_24hr,
+                volume1wk: m.volume_1wk,
+                liquidity: m.liquidity,
+                active: m.active,
+                closed: m.closed,
+                resolved: m.resolved,
+                eventId: m.event_id,
+                eventTitle: m.event_title,
+                eventSlug: m.event_slug,
+                eventImage: m.event_image,
+                eventStartDate: m.event_start_date,
+                eventEndDate: m.event_end_date,
+                eventTags: m.event_tags || [],
+                resolutionSource: m.resolution_source,
+                endDate: m.end_date,
+                startDate: m.start_date,
+                createdAt: m.created_at_pm,
+                updatedAt: m.updated_at_pm
+              }));
+              useDatabase = true;
+            }
+          }
+        } else if (isSportsSubcategory && kind.toLowerCase() === 'nfl') {
+          // Fetch NFL markets from database
+          const { data: dbMarkets, error } = await supabase
+            .from('markets')
+            .select('*')
+            .eq('category', 'sports')
+            .eq('active', true)
+            .eq('closed', false)
+            .gte('synced_at', fiveMinutesAgo)
+            .order('volume_24hr', { ascending: false })
+            .limit(limitNum);
+          
+          if (!error && dbMarkets && dbMarkets.length > 0) {
+            // Filter for NFL games (check event tags or question)
+            const nflMarkets = dbMarkets.filter(m => {
+              const tags = m.event_tags || [];
+              const hasNFLTag = tags.some(t => {
+                const tagId = typeof t === 'object' ? t.id : t;
+                return [1, 450, 100639].includes(Number(tagId)); // NFL tag IDs
+              });
+              return hasNFLTag;
+            });
+            
+            if (nflMarkets.length > 0) {
+              console.log(`[markets] Serving ${nflMarkets.length} NFL markets from database`);
+              markets = nflMarkets.map(m => ({
+                id: m.id,
+                conditionId: m.condition_id,
+                question: m.question,
+                slug: m.slug,
+                description: m.description,
+                image: m.image,
+                icon: m.icon,
+                outcomes: m.outcomes || [],
+                outcomePrices: m.outcome_prices || [],
+                volume: m.volume,
+                volume24hr: m.volume_24hr,
+                volume1wk: m.volume_1wk,
+                liquidity: m.liquidity,
+                active: m.active,
+                closed: m.closed,
+                resolved: m.resolved,
+                eventId: m.event_id,
+                eventTitle: m.event_title,
+                eventSlug: m.event_slug,
+                eventImage: m.event_image,
+                eventStartDate: m.event_start_date,
+                eventEndDate: m.event_end_date,
+                eventTags: m.event_tags || [],
+                resolutionSource: m.resolution_source,
+                endDate: m.end_date,
+                startDate: m.start_date,
+                createdAt: m.created_at_pm,
+                updatedAt: m.updated_at_pm
+              }));
+              useDatabase = true;
+            }
+          }
+        }
+      } catch (dbError) {
+        console.log("[markets] Database fetch failed, falling back to API:", dbError.message);
+        useDatabase = false;
+      }
+    }
+    
+    // If database fetch succeeded, apply filters and return
+    if (useDatabase && markets.length > 0) {
+      // Apply same filters as API path
+      // Filter: must have valid prices
+      markets = markets.filter(m => {
+        if (!m || m.closed === true) return false;
+        
+        let prices = m.outcomePrices;
+        if (typeof prices === 'string') {
+          try { prices = JSON.parse(prices); } catch(e) { return false; }
+        }
+        if (!prices || !Array.isArray(prices) || prices.length === 0) return false;
+        
+        const hasValidPrice = prices.some(p => {
+          const num = parseFloat(p);
+          return !isNaN(num) && num > 0 && num < 1;
+        });
+        
+        return hasValidPrice;
+      });
+      
+      // Filter: must meet minimum volume threshold
+      const beforeVolumeFilter = markets.length;
+      markets = markets.filter(m => {
+        const volume24hr = parseFloat(m.volume24hr) || 0;
+        const volume = parseFloat(m.volume) || 0;
+        const totalVolume = Math.max(volume24hr, volume);
+        return totalVolume > 0 && totalVolume >= minVolumeNum;
+      });
+      console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "zero/low-volume markets)");
+      
+      // Sort by volume (highest first)
+      markets.sort((a, b) => {
+        const volA = parseFloat(a.volume24hr) || parseFloat(a.volume) || 0;
+        const volB = parseFloat(b.volume24hr) || parseFloat(b.volume) || 0;
+        return volB - volA;
+      });
+      
+      // Transform and return (same as API path)
+      const transformed = markets.slice(0, limitNum).map(m => {
+        let outcomePrices = m.outcomePrices;
+        if (typeof outcomePrices === 'string') {
+          try { outcomePrices = JSON.parse(outcomePrices); } catch(e) { outcomePrices = []; }
+        }
+        outcomePrices = (outcomePrices || []).map(p => parseFloat(p) || 0);
+        
+        let outcomes = m.outcomes || ["Yes", "No"];
+        if (typeof outcomes === 'string') {
+          try { outcomes = JSON.parse(outcomes); } catch(e) { 
+            outcomes = outcomes.split(',').map(o => o.trim()).filter(o => o);
+          }
+        }
+        if (!Array.isArray(outcomes) || outcomes.length === 0) {
+          outcomes = ["Yes", "No"];
+        }
+        
+        return {
+          id: m.id,
+          conditionId: m.conditionId,
+          question: m.question,
+          slug: m.slug,
+          description: m.description,
+          image: m.image || m.eventImage,
+          icon: m.icon,
+          outcomes: outcomes,
+          outcomePrices: outcomePrices,
+          volume: m.volume || 0,
+          volume24hr: m.volume24hr || 0,
+          volume1wk: m.volume1wk || 0,
+          liquidity: m.liquidity || 0,
+          active: m.active !== false,
+          closed: m.closed || false,
+          resolved: m.resolved || false,
+          eventId: m.eventId,
+          eventTitle: m.eventTitle,
+          eventSlug: m.eventSlug,
+          eventImage: m.eventImage,
+          eventStartDate: m.eventStartDate,
+          eventEndDate: m.eventEndDate,
+          eventTags: m.eventTags || [],
+          resolutionSource: m.resolutionSource,
+          endDate: m.endDate,
+          startDate: m.startDate,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt
+        };
+      });
+      
+      const response = {
+        markets: transformed,
+        meta: { total: transformed.length, kind, source: 'database' }
+      };
+      
+      // Cache the response
+      if (limitNum <= 1000) {
+        const cacheKey = getCacheKey(kind, sportType);
+        setCache(cacheKey, response);
+      }
+      
+      return res.status(200).json(response);
+    }
+    
+    // If database fetch failed or returned no results, fall back to direct API
+    if (!useDatabase || markets.length === 0) {
+      console.log("[markets] Fetching from Polymarket API (database not available or empty)");
+      
+      const GAMMA_API = "https://gamma-api.polymarket.com";
     
     if (isCategory && kind !== "sports" && !isSportsSubcategory) {
       // Fetch markets for a specific category (Finance, Politics, Crypto, etc.)
