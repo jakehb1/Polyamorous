@@ -845,6 +845,8 @@
       cursor: pointer;
       user-select: none;
       transition: background 0.2s;
+      flex-wrap: nowrap;
+      overflow: hidden;
     }
     .event-header:hover {
       background: var(--card);
@@ -856,18 +858,28 @@
       flex: 1;
       min-width: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .event-title {
       font-size: 15px;
       font-weight: 600;
       line-height: 1.4;
-      margin-bottom: 6px;
       color: var(--text);
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
       word-break: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }
+    .event-title-text {
+      display: inline-block;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
     }
     .event-meta {
       display: flex;
@@ -878,10 +890,42 @@
     }
     .event-primary-prices {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
       margin-left: auto;
       margin-right: 8px;
+    }
+    .event-price-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+      flex-shrink: 0;
+    }
+    @media (max-width: 480px) {
+      .event-primary-prices {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .event-price-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .event-title {
+        font-size: 14px;
+      }
+      .event-header {
+        padding: 12px;
+        gap: 8px;
+      }
+      .event-image {
+        width: 40px;
+        height: 40px;
+      }
     }
     .event-collapse-icon {
       font-size: 18px;
@@ -896,16 +940,6 @@
     }
     .event-header.collapsed .event-collapse-icon {
       transform: rotate(-90deg);
-    }
-    .event-price-btn {
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: none;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.2s;
     }
     .event-price-btn:hover {
       opacity: 0.8;
@@ -2268,7 +2302,7 @@
                 <div class="event-info">
                   <div class="event-title">
                     ${weekLabel ? `<span class="week-tag">${weekLabel}</span>` : ''}
-                    ${event.eventTitle}
+                    <span class="event-title-text">${event.eventTitle}</span>
                   </div>
                   <div class="event-meta">
                     <span>Vol: ${formatVolume(eventVol)}</span>
