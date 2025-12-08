@@ -33,22 +33,36 @@ module.exports = async (req, res) => {
     }
 
     // Map Polymarket categories to our format
-    // Common categories based on Polymarket's structure
+    // Tag IDs verified from actual Polymarket events (see markets.js for source)
+    const categoryTagIds = {
+      "politics": 2,           // Politics - 267 events
+      "finance": 120,          // Finance - 22 events
+      "crypto": 21,            // Crypto - 59 events
+      "sports": 1,             // Sports - 47 events
+      "tech": 1401,           // Tech - 49 events
+      "geopolitics": 100265,   // Geopolitics - 100 events
+      "culture": 596,          // Culture (pop-culture) - 66 events
+      "world": 101970,         // World - 134 events
+      "economy": 100328,       // Economy - 26 events
+      "elections": 377,        // Elections 2024
+      "breaking": 198,         // Breaking News
+    };
+    
     const categoryMap = {
       "trending": { label: "Trending", icon: "", slug: "trending", isSort: true },
-      "breaking": { label: "Breaking", icon: "", slug: "breaking", isSort: true },
+      "breaking": { label: "Breaking", icon: "", slug: "breaking", isSort: true, tagId: categoryTagIds["breaking"] },
       "new": { label: "New", icon: "", slug: "new", isSort: true },
-      "politics": { label: "Politics", icon: "", slug: "politics", isCategory: true },
-      "sports": { label: "Sports", icon: "", slug: "sports", isCategory: true },
-      "finance": { label: "Finance", icon: "", slug: "finance", isCategory: true },
-      "crypto": { label: "Crypto", icon: "", slug: "crypto", isCategory: true },
-      "geopolitics": { label: "Geopolitics", icon: "", slug: "geopolitics", isCategory: true },
+      "politics": { label: "Politics", icon: "", slug: "politics", isCategory: true, tagId: categoryTagIds["politics"] },
+      "sports": { label: "Sports", icon: "", slug: "sports", isCategory: true, tagId: categoryTagIds["sports"] },
+      "finance": { label: "Finance", icon: "", slug: "finance", isCategory: true, tagId: categoryTagIds["finance"] },
+      "crypto": { label: "Crypto", icon: "", slug: "crypto", isCategory: true, tagId: categoryTagIds["crypto"] },
+      "geopolitics": { label: "Geopolitics", icon: "", slug: "geopolitics", isCategory: true, tagId: categoryTagIds["geopolitics"] },
       "earnings": { label: "Earnings", icon: "", slug: "earnings", isCategory: true },
-      "tech": { label: "Tech", icon: "", slug: "tech", isCategory: true },
-      "culture": { label: "Culture", icon: "", slug: "culture", isCategory: true },
-      "world": { label: "World", icon: "", slug: "world", isCategory: true },
-      "economy": { label: "Economy", icon: "", slug: "economy", isCategory: true },
-      "elections": { label: "Elections", icon: "", slug: "elections", isCategory: true },
+      "tech": { label: "Tech", icon: "", slug: "tech", isCategory: true, tagId: categoryTagIds["tech"] },
+      "culture": { label: "Culture", icon: "", slug: "culture", isCategory: true, tagId: categoryTagIds["culture"] },
+      "world": { label: "World", icon: "", slug: "world", isCategory: true, tagId: categoryTagIds["world"] },
+      "economy": { label: "Economy", icon: "", slug: "economy", isCategory: true, tagId: categoryTagIds["economy"] },
+      "elections": { label: "Elections", icon: "", slug: "elections", isCategory: true, tagId: categoryTagIds["elections"] },
     };
 
     // Extract unique categories from tags
@@ -81,10 +95,11 @@ module.exports = async (req, res) => {
     // Add predefined categories first, looking up tagId from API tags
     // Use exact slug matching to get the same tag IDs Polymarket uses
     for (const [key, cat] of Object.entries(categoryMap)) {
-      // For sort modes, tagId stays null. For categories, look up the tagId by exact slug match
-      let tagId = null;
-      if (cat.isCategory && !cat.isSort) {
-        // Exact match first (most reliable)
+      // Use predefined tagId if available (from verified mapping), otherwise look up
+      let tagId = cat.tagId || null;
+      
+      if (cat.isCategory && !cat.isSort && !tagId) {
+        // Fallback: look up the tagId by exact slug match
         tagId = tagSlugToId.get(cat.slug) || null;
         
         // If exact match fails, try to find by label/name
@@ -103,6 +118,8 @@ module.exports = async (req, res) => {
         } else {
           console.log(`[categories] WARNING: No tag ID found for ${cat.slug}`);
         }
+      } else if (tagId) {
+        console.log(`[categories] Using verified tag ID for ${cat.slug}: ${tagId}`);
       }
       
       // Always add predefined categories - they should match Polymarket's structure
