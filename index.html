@@ -2790,16 +2790,31 @@
         });
       });
       
-      // Add click handlers for event price buttons
+      // Add click handlers for event price buttons - open detail view
       list.querySelectorAll('.event-price-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           hapticFeedback('light');
           const marketId = btn.dataset.marketId;
-          const outcomeIndex = parseInt(btn.dataset.outcomeIndex, 10);
           const market = markets.find(m => String(m.id) === String(marketId));
           if (market) {
-            openTradeModal(market, outcomeIndex);
+            openMarketDetail(market);
+          }
+        });
+      });
+      
+      // Add click handlers for market cards - open detail view
+      list.querySelectorAll('.market-card, .market-outcome-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          // Don't open detail if clicking on outcome buttons
+          if (e.target.closest('.outcome-btn')) {
+            return;
+          }
+          hapticFeedback('light');
+          const marketId = item.dataset.id || item.dataset.marketId;
+          const market = markets.find(m => String(m.id) === String(marketId));
+          if (market) {
+            openMarketDetail(market);
           }
         });
       });
