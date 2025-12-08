@@ -99,178 +99,223 @@ module.exports = async (req, res) => {
       // Match Polymarket exactly by using their tag IDs
       console.log("[markets] Fetching markets for category:", kind);
       
-      // Get tag IDs for this category - use exact slug matching first
+      // Get tag IDs for this category - tags are on EVENTS, not markets directly
+      // Polymarket structure: Events have tags, markets are nested in events
       let categoryTagIds = [];
       let categoryTagId = null;
       
-      try {
-        const tagsResp = await fetch(`${GAMMA_API}/tags`);
-        if (tagsResp.ok) {
-          const tags = await tagsResp.json();
-          if (Array.isArray(tags)) {
-            const kindLower = kind.toLowerCase();
-            
-            // Strategy 1: Exact slug match (most reliable - matches Polymarket exactly)
-            const exactMatch = tags.find(tag => {
-              const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
-              return slug === kindLower;
-            });
-            
-            if (exactMatch && exactMatch.id) {
-              categoryTagIds = [exactMatch.id];
-              categoryTagId = exactMatch.id;
-              console.log("[markets] Found exact tag match for", kind, ":", exactMatch.id, "slug:", exactMatch.slug);
-            } else {
-              // Strategy 2: Try common variations if exact match fails
-              const variations = {
-                'politics': ['politics', 'political'],
-                'finance': ['finance', 'financial'],
-                'crypto': ['crypto', 'cryptocurrency'],
-                'tech': ['tech', 'technology'],
-                'geopolitics': ['geopolitics', 'geopolitical']
-              };
-              
-              const searchTerms = variations[kindLower] || [kindLower];
-              const matchingTags = tags.filter(tag => {
+      // Known tag IDs from Polymarket (discovered through testing)
+      const knownTagIds = {
+        'politics': 2,
+        'finance': 3,
+        'crypto': 4,
+        'sports': 5,
+        'tech': 6,
+        'geopolitics': 100265,
+        'culture': 596,
+        'world': 101970,
+        'economy': 7,
+        'elections': 377
+      };
+      
+      const kindLower = kind.toLowerCase();
+      if (knownTagIds[kindLower]) {
+        categoryTagIds = [knownTagIds[kindLower]];
+        categoryTagId = knownTagIds[kindLower];
+        console.log("[markets] Using known tag ID for", kind, ":", categoryTagId);
+      } else {
+        // Fallback: Try to find from /tags endpoint
+        try {
+          const tagsResp = await fetch(`${GAMMA_API}/tags`);
+          if (tagsResp.ok) {
+            const tags = await tagsResp.json();
+            if (Array.isArray(tags)) {
+              // Strategy 1: Exact slug match
+              const exactMatch = tags.find(tag => {
                 const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
-                return searchTerms.some(term => slug === term || slug.includes(term));
+                return slug === kindLower;
               });
               
-              if (matchingTags.length > 0) {
-                categoryTagIds = matchingTags.map(tag => tag.id).filter(id => id);
-                categoryTagId = categoryTagIds[0];
-                console.log("[markets] Found tag IDs via variation matching:", categoryTagIds);
+              if (exactMatch && exactMatch.id) {
+                categoryTagIds = [exactMatch.id];
+                categoryTagId = exactMatch.id;
+                console.log("[markets] Found exact tag match for", kind, ":", exactMatch.id, "slug:", exactMatch.slug);
               } else {
-                console.log("[markets] WARNING: No tag found for category:", kind);
+                // Strategy 2: Try common variations
+                const variations = {
+                  'politics': ['politics', 'political', 'uptspt-politics'],
+                  'finance': ['finance', 'financial'],
+                  'crypto': ['crypto', 'cryptocurrency'],
+                  'tech': ['tech', 'technology'],
+                  'geopolitics': ['geopolitics', 'geopolitical']
+                };
+                
+                const searchTerms = variations[kindLower] || [kindLower];
+                const matchingTags = tags.filter(tag => {
+                  const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+                  return searchTerms.some(term => slug === term || slug.includes(term));
+                });
+                
+                if (matchingTags.length > 0) {
+                  categoryTagIds = matchingTags.map(tag => tag.id).filter(id => id);
+                  categoryTagId = categoryTagIds[0];
+                  console.log("[markets] Found tag IDs via variation matching:", categoryTagIds);
+                } else {
+                  console.log("[markets] WARNING: No tag found for category:", kind);
+                }
               }
             }
           }
+        } catch (e) {
+          console.log("[markets] Error fetching tags for category:", e.message);
         }
-      } catch (e) {
-        console.log("[markets] Error fetching tags for category:", e.message);
       }
       
-      // Strategy 1: Fetch markets directly by tag ID(s) - this is how Polymarket does it
-      // Use exact tag IDs matching Polymarket's structure
+      // PRIMARY STRATEGY: Fetch from events endpoint - this is how Polymarket structures categories
+      // Events have tags, markets are nested inside events
       const tagIdsToUse = categoryTagIds.length > 0 ? categoryTagIds : (categoryTagId ? [categoryTagId] : []);
       
       if (tagIdsToUse.length > 0) {
-        // Fetch from all tag IDs in parallel for faster loading
-        // Use same parameters Polymarket uses: closed=false, active=true (if supported), high limit
-        const marketPromises = tagIdsToUse.map(async (tagId) => {
-          try {
-            // Match Polymarket's query structure exactly
-            const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000`;
-            console.log("[markets] Fetching from:", url);
-            const resp = await fetch(url);
-            if (resp.ok) {
-              const data = await resp.json();
-              if (Array.isArray(data)) {
-                const filtered = data.filter(m => !m.closed && m.active !== false);
-                console.log("[markets] Tag", tagId, "returned", data.length, "total markets,", filtered.length, "active");
-                // Log sample markets for debugging
-                if (filtered.length > 0 && filtered.length < 10) {
-                  console.log("[markets] Sample markets:", filtered.map(m => ({
-                    id: m.id,
-                    question: m.question?.substring(0, 50),
-                    volume: m.volume24hr || m.volume || 0
-                  })));
-                }
-                return filtered;
-              } else {
-                console.log("[markets] Tag", tagId, "returned non-array data:", typeof data);
-              }
-            } else {
-              console.log("[markets] Tag", tagId, "API returned status:", resp.status, resp.statusText);
-            }
-            return [];
-          } catch (e) {
-            console.log("[markets] Error fetching markets for tag", tagId, ":", e.message);
-            return [];
-          }
-        });
+        console.log("[markets] Fetching events with tag IDs:", tagIdsToUse);
         
+        // Fetch events with these tag IDs - events contain their markets
         try {
-          const marketArrays = await Promise.all(marketPromises);
-          const allMarkets = marketArrays.flat();
-          markets.push(...allMarkets);
-          console.log("[markets] Fetched", allMarkets.length, "markets from tag IDs", tagIdsToUse);
-        } catch (e) {
-          console.log("[markets] Error processing tag-based markets:", e.message);
-        }
-      } else {
-        console.log("[markets] WARNING: No tag IDs found for category", kind, "- cannot fetch markets");
-        // Try to fetch all tags to see what's available
-        try {
-          const debugTagsResp = await fetch(`${GAMMA_API}/tags`);
-          if (debugTagsResp.ok) {
-            const allTags = await debugTagsResp.json();
-            if (Array.isArray(allTags)) {
-              const politicsTags = allTags.filter(tag => {
-                const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
-                return slug.includes('politic') || slug.includes('election');
-              });
-              console.log("[markets] DEBUG: Found", politicsTags.length, "politics-related tags:", 
-                politicsTags.map(t => ({ id: t.id, slug: t.slug || t.label, name: t.name }))
-              );
+          // Try multiple event queries in parallel
+          const eventQueries = tagIdsToUse.map(tagId => 
+            `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=1000`
+          );
+          
+          // Also try direct tag_id filter on events if supported
+          eventQueries.push(...tagIdsToUse.map(tagId => 
+            `${GAMMA_API}/events?tag_id=${tagId}&closed=false&order=id&ascending=false&limit=1000`
+          ));
+          
+          const eventPromises = eventQueries.map(async (eventUrl) => {
+            try {
+              const resp = await fetch(eventUrl);
+              if (resp.ok) {
+                const events = await resp.json();
+                return Array.isArray(events) ? events : [];
+              }
+              return [];
+            } catch (e) {
+              console.log("[markets] Error fetching events:", e.message);
+              return [];
+            }
+          });
+          
+          const eventArrays = await Promise.all(eventPromises);
+          const allEvents = eventArrays.flat();
+          
+          // Deduplicate events by ID
+          const eventMap = new Map();
+          for (const event of allEvents) {
+            if (!eventMap.has(event.id)) {
+              eventMap.set(event.id, event);
             }
           }
-        } catch (e) {
-          console.log("[markets] DEBUG: Error fetching tags for debugging:", e.message);
-        }
-      }
-      
-      // Strategy 2: Also fetch from events endpoint (events contain their markets)
-      try {
-        const eventsUrl = `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=1000`;
-        const eventsResp = await fetch(eventsUrl);
-        if (eventsResp.ok) {
-          const events = await eventsResp.json();
-          if (Array.isArray(events)) {
-            for (const event of events) {
-              // Check if event matches this category
-              const eventTags = event.tags || [];
-              const eventMatchesCategory = categoryTagIds.length > 0 && eventTags.some(tag => {
-                const tagId = typeof tag === 'object' ? tag.id : tag;
-                return categoryTagIds.includes(tagId);
-              });
-              
-              // Also check event title/slug for category keywords
-              const eventTitle = (event.title || "").toLowerCase();
-              const eventSlug = (event.slug || "").toLowerCase();
-              const textMatches = eventTitle.includes(kind.toLowerCase()) || eventSlug.includes(kind.toLowerCase());
-              
-              if ((eventMatchesCategory || textMatches) && event.markets && Array.isArray(event.markets)) {
-                for (const market of event.markets) {
-                  if (!market.closed && market.active !== false) {
-                    const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
-                    if (!existing) {
-                      markets.push({
-                        ...market,
-                        eventId: event.id,
-                        eventTitle: event.title,
-                        eventSlug: event.slug,
-                        eventTicker: event.ticker,
-                        eventStartDate: event.startDate,
-                        eventEndDate: event.endDate,
-                        eventImage: event.image || event.icon,
-                        eventVolume: event.volume,
-                        eventLiquidity: event.liquidity,
-                        eventTags: event.tags || [],
-                      });
-                    }
+          
+          const uniqueEvents = Array.from(eventMap.values());
+          console.log("[markets] Found", uniqueEvents.length, "unique events");
+          
+          // Filter events by category tag IDs
+          const categoryEvents = uniqueEvents.filter(event => {
+            const eventTags = event.tags || [];
+            // Check if event has any of our category tag IDs
+            return eventTags.some(tag => {
+              const tagId = typeof tag === 'object' ? tag.id : tag;
+              return tagIdsToUse.includes(tagId);
+            });
+          });
+          
+          console.log("[markets] Found", categoryEvents.length, "events matching category tags");
+          
+          // Extract all markets from category events
+          for (const event of categoryEvents) {
+            if (event.markets && Array.isArray(event.markets)) {
+              for (const market of event.markets) {
+                if (!market.closed && market.active !== false) {
+                  const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                  if (!existing) {
+                    markets.push({
+                      ...market,
+                      eventId: event.id,
+                      eventTitle: event.title,
+                      eventSlug: event.slug,
+                      eventTicker: event.ticker,
+                      eventStartDate: event.startDate,
+                      eventEndDate: event.endDate,
+                      eventImage: event.image || event.icon,
+                      eventVolume: event.volume,
+                      eventLiquidity: event.liquidity,
+                      eventTags: event.tags || [],
+                    });
                   }
                 }
               }
             }
-            console.log("[markets] Added markets from events, total:", markets.length);
           }
+          
+          console.log("[markets] Extracted", markets.length, "markets from category events");
+        } catch (e) {
+          console.log("[markets] Error processing events:", e.message);
         }
-      } catch (e) {
-        console.log("[markets] Error fetching events for category:", e.message);
+      } else {
+        console.log("[markets] WARNING: No tag IDs found for category", kind, "- cannot fetch markets");
       }
       
-      // Strategy 2: If no markets found and we have tag IDs, try filtering all markets by tag
+      // FALLBACK: If we still have no markets, try fetching all events and filtering
+      if (markets.length === 0 && tagIdsToUse.length > 0) {
+        console.log("[markets] No markets from primary strategy, trying comprehensive fallback...");
+        try {
+          const eventsUrl = `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=2000`;
+          const eventsResp = await fetch(eventsUrl);
+          if (eventsResp.ok) {
+            const events = await eventsResp.json();
+            if (Array.isArray(events)) {
+              const categoryEvents = events.filter(event => {
+                const eventTags = event.tags || [];
+                return eventTags.some(tag => {
+                  const tagId = typeof tag === 'object' ? tag.id : tag;
+                  return tagIdsToUse.includes(tagId);
+                });
+              });
+              
+              console.log("[markets] Fallback found", categoryEvents.length, "category events");
+              
+              for (const event of categoryEvents) {
+                if (event.markets && Array.isArray(event.markets)) {
+                  for (const market of event.markets) {
+                    if (!market.closed && market.active !== false) {
+                      const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                      if (!existing) {
+                        markets.push({
+                          ...market,
+                          eventId: event.id,
+                          eventTitle: event.title,
+                          eventSlug: event.slug,
+                          eventTicker: event.ticker,
+                          eventStartDate: event.startDate,
+                          eventEndDate: event.endDate,
+                          eventImage: event.image || event.icon,
+                          eventVolume: event.volume,
+                          eventLiquidity: event.liquidity,
+                          eventTags: event.tags || [],
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+              console.log("[markets] Fallback extracted", markets.length, "markets");
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error in fallback events fetch:", e.message);
+        }
+      }
+      
+      // Strategy 3: If no markets found and we have tag IDs, try filtering all markets by tag
       // This is a fallback in case the tag_id query didn't work
       if (markets.length === 0 && categoryTagIds.length > 0) {
         try {
