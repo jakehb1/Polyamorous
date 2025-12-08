@@ -39,10 +39,10 @@ module.exports = async (req, res) => {
   const { kind = "trending", limit = "1000", sportType = null } = req.query;
   // Allow much higher limits to get all markets (default 1000, max 10000)
   const limitNum = Math.min(Math.max(Number(limit) || 1000, 1), 10000);
-  // Parse minVolume - default to 0 to get ALL markets (no volume filter by default)
+  // Parse minVolume - default to $1 to filter out zero-volume markets
   const minVolumeProvided = req.query.minVolume !== undefined && req.query.minVolume !== null;
-  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0;
-  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0 : minVolumeParsed, 0);
+  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 1;
+  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 1 : minVolumeParsed, 0);
   // sportType: "games" or "props" - used to filter sports markets
 
   // Check cache first (only for reasonable limits to avoid caching huge responses)
@@ -129,7 +129,8 @@ module.exports = async (req, res) => {
         // Fetch from all tag IDs in parallel for faster loading
         const marketPromises = tagIdsToUse.map(async (tagId) => {
           try {
-            const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000`;
+            // Use minVolume parameter if Gamma API supports it, otherwise filter after
+            const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000&minVolume=${minVolumeNum}`;
             const resp = await fetch(url);
             if (resp.ok) {
               const data = await resp.json();
@@ -205,7 +206,7 @@ module.exports = async (req, res) => {
       // Strategy 3: Fallback - fetch all markets and filter by tag (if we have tag IDs)
       if (markets.length === 0 && categoryTagIds.length > 0) {
         try {
-          const url = `${GAMMA_API}/markets?closed=false&limit=5000`;
+          const url = `${GAMMA_API}/markets?closed=false&limit=5000&minVolume=${minVolumeNum}`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
@@ -504,9 +505,9 @@ module.exports = async (req, res) => {
                 categoryTagId = categoryTag.id;
                 categoryTagIds = [categoryTag.id];
                 console.log("[markets] Found tag ID from /tags endpoint:", categoryTagId);
-              }
             }
-          } catch (e) {
+          }
+        } catch (e) {
             console.log("[markets] Error parsing /tags:", e.message);
           }
         }
@@ -1201,18 +1202,16 @@ module.exports = async (req, res) => {
 
     console.log("[markets] After price filter:", markets.length);
 
-    // Filter: must meet minimum volume threshold (only if minVolumeNum > 0)
-    if (minVolumeNum > 0) {
-      markets = markets.filter(m => {
-        const volume24hr = parseFloat(m.volume24hr) || 0;
-        const volume = parseFloat(m.volume) || 0;
-        const totalVolume = Math.max(volume24hr, volume);
-        return totalVolume >= minVolumeNum;
-      });
-      console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length);
-    } else {
-      console.log("[markets] No volume filter applied, keeping all", markets.length, "markets");
-    }
+    // Filter: must meet minimum volume threshold - always filter out zero-volume markets
+    const beforeVolumeFilter = markets.length;
+    markets = markets.filter(m => {
+      const volume24hr = parseFloat(m.volume24hr) || 0;
+      const volume = parseFloat(m.volume) || 0;
+      const totalVolume = Math.max(volume24hr, volume);
+      // Always exclude zero-volume markets, and apply minVolume threshold if set
+      return totalVolume > 0 && totalVolume >= minVolumeNum;
+    });
+    console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "zero/low-volume markets)");
 
     // Sort by volume (highest first)
     markets.sort((a, b) => {
