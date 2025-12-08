@@ -56,10 +56,47 @@ module.exports = async (req, res) => {
     checks.supabase.error = "Not configured";
   }
 
+  // Test Polymarket Gamma API connection
+  try {
+    const GAMMA_API = "https://gamma-api.polymarket.com";
+    const testResp = await fetch(`${GAMMA_API}/tags`);
+    checks.polymarket = {
+      connected: testResp.ok,
+      status: testResp.status,
+      statusText: testResp.statusText,
+    };
+    
+    if (testResp.ok) {
+      const tags = await testResp.json();
+      checks.polymarket.tagsCount = Array.isArray(tags) ? tags.length : 0;
+      
+      // Check for politics tag
+      if (Array.isArray(tags)) {
+        const politicsTag = tags.find(tag => {
+          const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+          return slug === 'politics' || slug.includes('politic');
+        });
+        checks.polymarket.politicsTag = politicsTag ? {
+          id: politicsTag.id,
+          slug: politicsTag.slug || politicsTag.label,
+          name: politicsTag.name
+        } : null;
+      }
+    } else {
+      checks.polymarket.error = `HTTP ${testResp.status}: ${testResp.statusText}`;
+    }
+  } catch (err) {
+    checks.polymarket = {
+      connected: false,
+      error: err.message,
+    };
+  }
+
   // Overall status
   checks.ok = checks.supabase.configured && 
               checks.encryption.valid && 
-              (checks.supabase.connected !== false);
+              (checks.supabase.connected !== false) &&
+              checks.polymarket.connected;
 
   const status = checks.ok ? 200 : 503;
   
