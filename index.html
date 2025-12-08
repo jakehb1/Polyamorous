@@ -24,10 +24,10 @@
       --text: #687E90;
       --text-muted: #8a9ba8;
       --accent: #687E90;
-      --accent-light: #8BAC8C;
-      --accent-pink: #8BAC8C;
-      --green: #8BAC8C;
-      --green-soft: #a8c5a8;
+      --accent-light: #4B4B4B;
+      --accent-pink: #4B4B4B;
+      --green: #4B4B4B;
+      --green-soft: #6b6b6b;
       --red: #d97777;
       --border: #c5d9e8;
       --bg-secondary: #e0f0f8;
@@ -1438,11 +1438,11 @@
       flex-shrink: 0;
     }
     .outcome-dot.blue { background: #687E90; }
-    .outcome-dot.green { background: #8BAC8C; }
-    .outcome-dot.orange { background: #9bb5a8; }
-    .outcome-dot.red { background: #a8c5a8; }
-    .outcome-dot.purple { background: #b5d5b8; }
-    .outcome-dot.pink { background: #c2e5c8; }
+    .outcome-dot.green { background: #4B4B4B; }
+    .outcome-dot.orange { background: #5b5b5b; }
+    .outcome-dot.red { background: #6b6b6b; }
+    .outcome-dot.purple { background: #7b7b7b; }
+    .outcome-dot.pink { background: #8b8b8b; }
     .outcome-label {
       flex: 1;
       font-size: 14px;
@@ -3061,7 +3061,7 @@
         }
         
         // Draw lines for each outcome (using new color scheme)
-        const colors = ['#687E90', '#8BAC8C', '#9bb5a8', '#a8c5a8', '#b5d5b8', '#c2e5c8'];
+        const colors = ['#687E90', '#4B4B4B', '#5b5b5b', '#6b6b6b', '#7b7b7b', '#8b8b8b'];
         
         if (historyData && historyData.length > 0) {
           // Use real historical data from API
