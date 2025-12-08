@@ -160,13 +160,27 @@ module.exports = async (req, res) => {
           try {
             // Match Polymarket's query structure exactly
             const url = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=5000`;
+            console.log("[markets] Fetching from:", url);
             const resp = await fetch(url);
             if (resp.ok) {
               const data = await resp.json();
               if (Array.isArray(data)) {
-                // Filter for active, non-closed markets (same as Polymarket)
-                return data.filter(m => !m.closed && m.active !== false);
+                const filtered = data.filter(m => !m.closed && m.active !== false);
+                console.log("[markets] Tag", tagId, "returned", data.length, "total markets,", filtered.length, "active");
+                // Log sample markets for debugging
+                if (filtered.length > 0 && filtered.length < 10) {
+                  console.log("[markets] Sample markets:", filtered.map(m => ({
+                    id: m.id,
+                    question: m.question?.substring(0, 50),
+                    volume: m.volume24hr || m.volume || 0
+                  })));
+                }
+                return filtered;
+              } else {
+                console.log("[markets] Tag", tagId, "returned non-array data:", typeof data);
               }
+            } else {
+              console.log("[markets] Tag", tagId, "API returned status:", resp.status, resp.statusText);
             }
             return [];
           } catch (e) {
@@ -1257,9 +1271,26 @@ module.exports = async (req, res) => {
       const volume = parseFloat(m.volume) || 0;
       const totalVolume = Math.max(volume24hr, volume);
       // Always exclude zero-volume markets, and apply minVolume threshold if set
-      return totalVolume > 0 && totalVolume >= minVolumeNum;
+      const passes = totalVolume > 0 && totalVolume >= minVolumeNum;
+      if (!passes && beforeVolumeFilter < 100) {
+        // Log sample of filtered markets for debugging when we have few markets
+        console.log("[markets] Filtered market:", m.question?.substring(0, 50), "volume:", totalVolume);
+      }
+      return passes;
     });
     console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "zero/low-volume markets)");
+    
+    // If we have very few markets after filtering, log details for debugging
+    if (markets.length === 0 && beforeVolumeFilter > 0) {
+      console.log("[markets] DEBUG: All markets filtered out by volume. Sample volumes:", 
+        beforeVolumeFilter > 0 ? 
+          Array.from(new Set(markets.map(m => {
+            const v24 = parseFloat(m.volume24hr) || 0;
+            const v = parseFloat(m.volume) || 0;
+            return Math.max(v24, v);
+          }).slice(0, 5))) : 'none'
+      );
+    }
 
     // Sort by volume (highest first)
     markets.sort((a, b) => {
