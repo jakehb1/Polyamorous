@@ -133,6 +133,63 @@ CREATE TRIGGER update_market_events_updated_at
 GRANT ALL ON markets TO service_role;
 GRANT ALL ON market_events TO service_role;
 
+-- Categories table - stores categories/tags from Polymarket
+CREATE TABLE IF NOT EXISTS categories (
+  id text PRIMARY KEY, -- Can be tag ID or custom ID (like "trending", "new")
+  tag_id text, -- Polymarket tag ID (if applicable)
+  label text NOT NULL,
+  slug text NOT NULL UNIQUE,
+  icon text,
+  is_sort boolean DEFAULT false, -- true for sort modes like "trending", "new"
+  is_category boolean DEFAULT false, -- true for actual categories
+  description text,
+  order_index integer DEFAULT 0, -- For custom ordering
+  
+  -- Polymarket metadata
+  force_show boolean DEFAULT false,
+  force_hide boolean DEFAULT false,
+  published_at timestamptz,
+  
+  -- Our tracking
+  synced_at timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Indexes for categories
+CREATE INDEX IF NOT EXISTS categories_slug_idx ON categories(slug);
+CREATE INDEX IF NOT EXISTS categories_tag_id_idx ON categories(tag_id);
+CREATE INDEX IF NOT EXISTS categories_is_category_idx ON categories(is_category);
+CREATE INDEX IF NOT EXISTS categories_is_sort_idx ON categories(is_sort);
+CREATE INDEX IF NOT EXISTS categories_synced_at_idx ON categories(synced_at);
+CREATE INDEX IF NOT EXISTS categories_order_idx ON categories(order_index);
+
+-- Enable RLS
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy
+DROP POLICY IF EXISTS "Service role full access categories" ON categories;
+CREATE POLICY "Service role full access categories"
+  ON categories FOR ALL
+  USING (
+    current_setting('request.jwt.claims', true)::json->>'role' = 'service_role' OR
+    current_setting('request.jwt.claims', true)::json IS NULL
+  )
+  WITH CHECK (
+    current_setting('request.jwt.claims', true)::json->>'role' = 'service_role' OR
+    current_setting('request.jwt.claims', true)::json IS NULL
+  );
+
+-- Auto-update trigger
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
+CREATE TRIGGER update_categories_updated_at
+  BEFORE UPDATE ON categories
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Grant permissions
+GRANT ALL ON categories TO service_role;
+
 -- Success message
-SELECT 'Markets tables created successfully!' AS status;
+SELECT 'Markets and categories tables created successfully!' AS status;
 

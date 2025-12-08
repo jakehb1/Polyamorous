@@ -1,6 +1,6 @@
 // api/sync-markets.js
-// Background job to sync markets from Polymarket to Supabase
-// This mimics Polymarket's architecture by storing markets in our database
+// Background job to sync markets and categories from Polymarket to Supabase
+// This mimics Polymarket's architecture by storing markets and categories in our database
 
 const GAMMA_API = "https://gamma-api.polymarket.com";
 
@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
   //   return res.status(401).json({ error: "unauthorized" });
   // }
 
-  const { category = null, full = false } = req.query;
+  const { category = null, full = false, sync_categories = true } = req.query;
   
   try {
     // Check Supabase connection
@@ -50,6 +50,19 @@ module.exports = async (req, res) => {
 
     let syncedCount = 0;
     let eventCount = 0;
+    let categoriesSynced = 0;
+
+    // Sync categories first (if enabled)
+    if (sync_categories !== 'false') {
+      console.log("[sync-markets] Syncing categories from Polymarket...");
+      try {
+        categoriesSynced = await syncCategories(supabase);
+        console.log(`[sync-markets] Synced ${categoriesSynced} categories`);
+      } catch (err) {
+        console.error("[sync-markets] Error syncing categories:", err.message);
+        // Don't fail the whole sync if categories fail
+      }
+    }
 
     if (category) {
       // Sync specific category
@@ -83,6 +96,7 @@ module.exports = async (req, res) => {
       success: true,
       synced_markets: syncedCount,
       synced_events: eventCount,
+      synced_categories: categoriesSynced,
       timestamp: new Date().toISOString()
     });
 
@@ -222,6 +236,171 @@ async function syncCategory(supabase, category, tagId, fullSync = false) {
 
   } catch (err) {
     console.error(`[sync-markets] Error syncing category ${category}:`, err);
+    throw err;
+  }
+}
+
+async function syncCategories(supabase) {
+  console.log("[sync-markets] Fetching categories from Polymarket...");
+  
+  try {
+    const GAMMA_API = "https://gamma-api.polymarket.com";
+    const tagsResp = await fetch(`${GAMMA_API}/tags`);
+    
+    if (!tagsResp.ok) {
+      throw new Error(`Tags API returned ${tagsResp.status}`);
+    }
+
+    const tags = await tagsResp.json();
+    if (!Array.isArray(tags)) {
+      throw new Error("Tags API returned non-array");
+    }
+
+    console.log(`[sync-markets] Found ${tags.length} tags from Polymarket`);
+
+    // Known category mappings (sort modes and main categories)
+    const categoryMap = {
+      "trending": { label: "Trending", slug: "trending", isSort: true, isCategory: false, orderIndex: 1 },
+      "breaking": { label: "Breaking", slug: "breaking", isSort: true, isCategory: false, orderIndex: 2 },
+      "new": { label: "New", slug: "new", isSort: true, isCategory: false, orderIndex: 3 },
+      "politics": { label: "Politics", slug: "politics", isCategory: true, isSort: false, orderIndex: 10 },
+      "sports": { label: "Sports", slug: "sports", isCategory: true, isSort: false, orderIndex: 11 },
+      "finance": { label: "Finance", slug: "finance", isCategory: true, isSort: false, orderIndex: 12 },
+      "crypto": { label: "Crypto", slug: "crypto", isCategory: true, isSort: false, orderIndex: 13 },
+      "geopolitics": { label: "Geopolitics", slug: "geopolitics", isCategory: true, isSort: false, orderIndex: 14 },
+      "tech": { label: "Tech", slug: "tech", isCategory: true, isSort: false, orderIndex: 15 },
+      "culture": { label: "Culture", slug: "culture", isCategory: true, isSort: false, orderIndex: 16 },
+      "world": { label: "World", slug: "world", isCategory: true, isSort: false, orderIndex: 17 },
+      "economy": { label: "Economy", slug: "economy", isCategory: true, isSort: false, orderIndex: 18 },
+      "elections": { label: "Elections", slug: "elections", isCategory: true, isSort: false, orderIndex: 19 },
+    };
+
+    // Build tag slug to ID map
+    const tagSlugToId = new Map();
+    for (const tag of tags) {
+      if (tag.id) {
+        const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+        if (slug) {
+          tagSlugToId.set(slug, tag.id);
+        }
+      }
+    }
+
+    let categoriesSynced = 0;
+    const seenSlugs = new Set();
+
+    // Sync predefined categories first
+    for (const [key, cat] of Object.entries(categoryMap)) {
+      let tagId = null;
+      
+      // Look up tag ID from Polymarket tags
+      if (cat.isCategory) {
+        tagId = tagSlugToId.get(cat.slug) || null;
+        
+        // If not found, search by label
+        if (!tagId) {
+          for (const tag of tags) {
+            const tagSlug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+            if (tagSlug === cat.slug.toLowerCase() && tag.id) {
+              tagId = tag.id;
+              break;
+            }
+          }
+        }
+      }
+
+      const categoryData = {
+        id: key,
+        tag_id: tagId ? String(tagId) : null,
+        label: cat.label,
+        slug: cat.slug,
+        icon: "",
+        is_sort: cat.isSort || false,
+        is_category: cat.isCategory || false,
+        order_index: cat.orderIndex || 0,
+        synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('categories')
+        .upsert(categoryData, { onConflict: 'id' });
+
+      if (error) {
+        console.error(`[sync-markets] Error upserting category ${key}:`, error);
+      } else {
+        categoriesSynced++;
+        seenSlugs.add(cat.slug);
+      }
+    }
+
+    // Sync additional categories from Polymarket tags (popular ones)
+    // Only add categories that have significant usage
+    const excludeTerms = new Set([
+      'saudi arabia', 'united states', 'russia', 'china', 'india', 'brazil', 'japan',
+      'germany', 'france', 'uk', 'united kingdom', 'canada', 'australia', 'south korea',
+      'italy', 'spain', 'mexico', 'indonesia', 'netherlands', 'turkey', 'switzerland',
+      'poland', 'belgium', 'sweden', 'norway', 'denmark', 'finland', 'ireland',
+      'portugal', 'greece', 'czech republic', 'romania', 'hungary', 'ukraine',
+      'israel', 'egypt', 'south africa', 'argentina', 'chile', 'colombia', 'peru',
+      'philippines', 'vietnam', 'thailand', 'malaysia', 'singapore', 'new zealand',
+      'saudi', 'arabia', 'arab', 'emirates', 'qatar', 'kuwait', 'bahrain', 'oman'
+    ]);
+
+    let additionalCount = 0;
+    for (const tag of tags) {
+      if (additionalCount >= 10) break; // Limit additional categories
+      
+      const slug = (tag.slug || tag.label || tag.name || "").toLowerCase();
+      const label = tag.label || tag.name || slug;
+      
+      if (seenSlugs.has(slug) || !tag.id) continue;
+      if (excludeTerms.has(slug)) continue;
+      
+      const words = slug.split(/\s+/);
+      if (words.length > 2) continue;
+      
+      const isMainCategory = !slug.includes("-") || slug.split("-").length <= 2;
+      const isProperNoun = /^[A-Z]/.test(label) && words.length === 1;
+      if (isProperNoun && !['nfl', 'nba', 'mlb', 'nhl', 'ufc', 'wnba', 'cbb', 'cfb'].includes(slug)) {
+        continue;
+      }
+      
+      if (isMainCategory) {
+        const categoryData = {
+          id: String(tag.id),
+          tag_id: String(tag.id),
+          label: label.charAt(0).toUpperCase() + label.slice(1),
+          slug: slug,
+          icon: "",
+          is_sort: false,
+          is_category: true,
+          order_index: 100 + additionalCount, // Put additional categories at end
+          force_show: tag.forceShow || false,
+          force_hide: tag.forceHide || false,
+          published_at: tag.publishedAt ? new Date(tag.publishedAt).toISOString() : null,
+          synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+          .from('categories')
+          .upsert(categoryData, { onConflict: 'id' });
+
+        if (!error) {
+          categoriesSynced++;
+          additionalCount++;
+          seenSlugs.add(slug);
+        }
+      }
+    }
+
+    console.log(`[sync-markets] Synced ${categoriesSynced} categories (${Object.keys(categoryMap).length} predefined + ${additionalCount} additional)`);
+    
+    return categoriesSynced;
+
+  } catch (err) {
+    console.error("[sync-markets] Error syncing categories:", err);
     throw err;
   }
 }

@@ -1,5 +1,6 @@
 // api/categories.js
-// Fetches all available categories/tags from Polymarket Gamma API
+// Fetches categories from Supabase database (synced from Polymarket)
+// Falls back to Polymarket Gamma API if database is not configured or empty
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -12,8 +13,55 @@ module.exports = async (req, res) => {
   const GAMMA_API = "https://gamma-api.polymarket.com";
   
   try {
-    // Fetch all tags/categories
-    const tagsResp = await fetch(`${GAMMA_API}/tags`);
+    // Try to fetch from Supabase database first
+    let useDatabase = false;
+    let categories = [];
+    
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+      try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+        
+        // Check if we have categories synced within last hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        
+        const { data: dbCategories, error } = await supabase
+          .from('categories')
+          .select('*')
+          .gte('synced_at', oneHourAgo)
+          .order('order_index', { ascending: true });
+        
+        if (!error && dbCategories && dbCategories.length > 0) {
+          console.log(`[categories] Serving ${dbCategories.length} categories from database`);
+          
+          // Transform database format to API format
+          categories = dbCategories.map(cat => ({
+            id: cat.id,
+            label: cat.label,
+            icon: cat.icon || "",
+            slug: cat.slug,
+            isSort: cat.is_sort || false,
+            isCategory: cat.is_category || false,
+            tagId: cat.tag_id ? Number(cat.tag_id) : null
+          }));
+          
+          useDatabase = true;
+        }
+      } catch (dbError) {
+        console.log("[categories] Database fetch failed, falling back to API:", dbError.message);
+        useDatabase = false;
+      }
+    }
+    
+    // If database fetch failed or returned no results, fall back to live API
+    if (!useDatabase || categories.length === 0) {
+      console.log("[categories] Fetching from Polymarket API (database not available or empty)");
+      
+      // Fetch all tags/categories
+      const tagsResp = await fetch(`${GAMMA_API}/tags`);
     
     if (!tagsResp.ok) {
       return res.status(500).json({ 
@@ -174,11 +222,17 @@ module.exports = async (req, res) => {
       }
     }
 
-    console.log(`[categories] Returning ${categories.length} categories`);
+      console.log(`[categories] Returning ${categories.length} categories from API`);
+    } else {
+      console.log(`[categories] Returning ${categories.length} categories from database`);
+    }
 
     return res.status(200).json({ 
       categories: categories,
-      meta: { total: categories.length }
+      meta: { 
+        total: categories.length,
+        source: useDatabase ? 'database' : 'api'
+      }
     });
     
   } catch (err) {
