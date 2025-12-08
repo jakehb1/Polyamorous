@@ -1,6 +1,6 @@
 // api/market-history.js
-// Fetches historical price data for a specific market from Polymarket
-// This endpoint provides price history for the market detail graph
+// Fetches historical price data from database (tracked over time)
+// Falls back to simulated data if database is empty or not configured
 
 const GAMMA_API = "https://gamma-api.polymarket.com";
 
@@ -22,103 +22,153 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Try to fetch market details first to get condition ID if needed
-    let conditionIdToUse = conditionId;
+    const marketIdToUse = marketId || conditionId;
     
-    if (!conditionIdToUse && marketId) {
-      try {
-        const marketResp = await fetch(`${GAMMA_API}/markets?condition_id=${marketId}&limit=1`);
-        if (marketResp.ok) {
-          const markets = await marketResp.json();
-          if (Array.isArray(markets) && markets.length > 0) {
-            conditionIdToUse = markets[0].conditionId || markets[0].id;
-          }
-        }
-      } catch (e) {
-        console.log("[market-history] Error fetching market:", e.message);
-      }
-    }
-
-    // Polymarket doesn't have a direct historical price API endpoint
-    // We'll need to use the market's current data and simulate or fetch from alternative sources
-    // For now, return the current market data with a note that historical data needs to be tracked
-    
-    const marketResp = await fetch(`${GAMMA_API}/markets?condition_id=${conditionIdToUse || marketId}&limit=1`);
-    
-    if (!marketResp.ok) {
-      return res.status(500).json({
-        error: "fetch_failed",
-        message: `Market API returned ${marketResp.status}`,
-        history: []
-      });
-    }
-
-    const markets = await marketResp.json();
-    
-    if (!Array.isArray(markets) || markets.length === 0) {
-      return res.status(404).json({
-        error: "market_not_found",
-        message: "Market not found",
-        history: []
-      });
-    }
-
-    const market = markets[0];
-    const outcomes = market.outcomes || ["Yes", "No"];
-    const currentPrices = market.outcomePrices || [];
-    
-    // Generate historical data points based on current price
-    // In production, this should be fetched from a historical data service or tracked over time
-    const now = Date.now();
+    // Calculate time range
+    const now = new Date();
     const rangeMs = {
       '1H': 60 * 60 * 1000,
       '6H': 6 * 60 * 60 * 1000,
       '1D': 24 * 60 * 60 * 1000,
       '1W': 7 * 24 * 60 * 60 * 1000,
       '1M': 30 * 24 * 60 * 60 * 1000,
-      'ALL': 7 * 24 * 60 * 60 * 1000 // Default to 1 week
+      'ALL': 90 * 24 * 60 * 60 * 1000 // 90 days (matches cleanup interval)
     };
     
     const timeRange = rangeMs[range] || rangeMs['ALL'];
-    const startTime = now - timeRange;
-    const points = 100; // Number of data points to return
+    const startTime = new Date(now.getTime() - timeRange);
     
-    // Generate historical price data for each outcome
-    const history = outcomes.map((outcome, index) => {
-      const currentPrice = currentPrices[index] !== undefined ? parseFloat(currentPrices[index]) : 0.5;
-      const dataPoints = [];
-      
-      for (let i = 0; i < points; i++) {
-        const timestamp = startTime + (timeRange / points) * i;
-        // Simulate price movement (in production, use real historical data)
-        // For now, create realistic-looking data that trends toward current price
-        const progress = i / points;
-        const baseVariation = (Math.sin(progress * Math.PI * 4) * 0.1) + (Math.random() * 0.05 - 0.025);
-        const trend = (currentPrice - 0.5) * progress; // Trend from 0.5 to current price
-        const price = Math.max(0.01, Math.min(0.99, 0.5 + trend + baseVariation));
+    // Try to fetch from database first
+    let useDatabase = false;
+    let history = [];
+    let outcomes = ["Yes", "No"];
+    let currentPrices = [0.5, 0.5];
+    
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+      try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
         
-        dataPoints.push({
-          timestamp,
-          price,
-          outcome: outcome
-        });
+        // Fetch price history from database
+        const { data: priceHistory, error } = await supabase
+          .from('market_price_history')
+          .select('*')
+          .eq('market_id', marketIdToUse)
+          .gte('timestamp', startTime.toISOString())
+          .order('timestamp', { ascending: true });
+        
+        if (!error && priceHistory && priceHistory.length > 0) {
+          console.log(`[market-history] Found ${priceHistory.length} price history records from database`);
+          
+          // Get unique outcomes
+          const outcomeMap = new Map();
+          priceHistory.forEach(record => {
+            if (!outcomeMap.has(record.outcome_index)) {
+              outcomeMap.set(record.outcome_index, {
+                outcomeIndex: record.outcome_index,
+                outcome: record.outcome_name || `Outcome ${record.outcome_index}`,
+                data: []
+              });
+            }
+            outcomeMap.get(record.outcome_index).data.push({
+              timestamp: new Date(record.timestamp).getTime(),
+              price: parseFloat(record.price),
+              volume: parseFloat(record.volume) || 0,
+              liquidity: parseFloat(record.liquidity) || 0
+            });
+          });
+          
+          history = Array.from(outcomeMap.values());
+          
+          // Get current prices from most recent records
+          const latestRecords = priceHistory
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .filter((record, index, self) => 
+              index === self.findIndex(r => r.outcome_index === record.outcome_index)
+            );
+          
+          outcomes = latestRecords.map(r => r.outcome_name || `Outcome ${r.outcome_index}`).sort((a, b) => {
+            const aIdx = latestRecords.find(r => (r.outcome_name || `Outcome ${r.outcome_index}`) === a)?.outcome_index || 0;
+            const bIdx = latestRecords.find(r => (r.outcome_name || `Outcome ${r.outcome_index}`) === b)?.outcome_index || 0;
+            return aIdx - bIdx;
+          });
+          currentPrices = latestRecords
+            .sort((a, b) => a.outcome_index - b.outcome_index)
+            .map(r => parseFloat(r.price));
+          
+          useDatabase = true;
+        } else {
+          console.log(`[market-history] No price history in database for market ${marketIdToUse}, falling back to simulated data`);
+        }
+      } catch (dbError) {
+        console.log("[market-history] Database fetch failed, falling back to simulated data:", dbError.message);
       }
+    }
+    
+    // If database has no data, fetch current market data and generate simulated history
+    if (!useDatabase || history.length === 0) {
+      console.log("[market-history] Using simulated historical data");
       
-      return {
-        outcome,
-        outcomeIndex: index,
-        data: dataPoints
-      };
-    });
+      try {
+        const marketResp = await fetch(`${GAMMA_API}/markets?condition_id=${marketIdToUse}&limit=1`);
+        
+        if (marketResp.ok) {
+          const markets = await marketResp.json();
+          
+          if (Array.isArray(markets) && markets.length > 0) {
+            const market = markets[0];
+            outcomes = market.outcomes || ["Yes", "No"];
+            currentPrices = market.outcomePrices || [];
+            
+            // Generate simulated historical data based on current price
+            const points = 100;
+            history = outcomes.map((outcome, index) => {
+              const currentPrice = currentPrices[index] !== undefined ? parseFloat(currentPrices[index]) : 0.5;
+              const dataPoints = [];
+              
+              for (let i = 0; i < points; i++) {
+                const timestamp = startTime.getTime() + (timeRange / points) * i;
+                // Simulate price movement that trends toward current price
+                const progress = i / points;
+                const baseVariation = (Math.sin(progress * Math.PI * 4) * 0.1) + (Math.random() * 0.05 - 0.025);
+                const trend = (currentPrice - 0.5) * progress;
+                const price = Math.max(0.01, Math.min(0.99, 0.5 + trend + baseVariation));
+                
+                dataPoints.push({
+                  timestamp,
+                  price,
+                  volume: 0,
+                  liquidity: 0
+                });
+              }
+              
+              return {
+                outcome,
+                outcomeIndex: index,
+                data: dataPoints
+              };
+            });
+          }
+        }
+      } catch (apiError) {
+        console.error("[market-history] Error fetching market from API:", apiError);
+      }
+    }
 
     return res.status(200).json({
-      marketId: market.id || marketId,
-      conditionId: conditionIdToUse || marketId,
+      marketId: marketIdToUse,
+      conditionId: conditionId || marketIdToUse,
       range,
       history,
       currentPrices,
       outcomes,
-      note: "Historical data is simulated. Real historical tracking requires storing price snapshots over time."
+      source: useDatabase ? 'database' : 'simulated',
+      note: useDatabase 
+        ? "Real historical data from database" 
+        : "Simulated data. Price tracking will begin after first sync."
     });
 
   } catch (err) {
@@ -130,4 +180,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
