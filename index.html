@@ -2977,20 +2977,33 @@
       canvas.width = container.clientWidth - 32; // Account for padding
       canvas.height = 200;
       
-      // Generate mock historical data (in production, fetch from API)
-      const timeRanges = {
-        '1H': 60,
-        '6H': 360,
-        '1D': 1440,
-        '1W': 10080,
-        '1M': 43200,
-        'ALL': 10080
-      };
-      
       let currentRange = 'ALL';
+      let historicalData = null;
       
-      function drawGraph(range = 'ALL') {
-        const points = timeRanges[range] || 10080;
+      // Fetch historical data from API
+      async function fetchHistoricalData(range = 'ALL') {
+        try {
+          const marketId = market.id || market.conditionId;
+          if (!marketId) {
+            console.log("[market-detail] No market ID, using mock data");
+            return null;
+          }
+          
+          const resp = await fetch(`/api/market-history?marketId=${marketId}&range=${range}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            return data.history || null;
+          } else {
+            console.log("[market-detail] Historical data API failed, using mock data");
+            return null;
+          }
+        } catch (err) {
+          console.log("[market-detail] Error fetching historical data:", err);
+          return null;
+        }
+      }
+      
+      function drawGraph(range = 'ALL', historyData = null) {
         const width = canvas.width;
         const height = canvas.height;
         
@@ -3012,46 +3025,97 @@
           ctx.stroke();
         }
         
+        // Draw Y-axis labels (percentages)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = '10px sans-serif';
+        for (let i = 0; i <= 10; i++) {
+          const percent = 100 - (i * 10);
+          const y = (height / 10) * i;
+          ctx.fillText(`${percent}%`, 4, y + 4);
+        }
+        
         // Draw lines for each outcome
         const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-        outcomes.forEach((outcome, index) => {
-          const color = colors[index % colors.length];
-          const basePrice = prices[index] !== undefined ? parseFloat(prices[index]) : 0.5;
-          
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          
-          // Generate mock data points
-          for (let i = 0; i < points; i += Math.max(1, Math.floor(points / 100))) {
-            const x = (width / points) * i;
-            // Simulate price movement around base price
-            const variation = (Math.sin(i / 10) * 0.1) + (Math.random() * 0.05 - 0.025);
-            const price = Math.max(0.01, Math.min(0.99, basePrice + variation));
-            const y = height - (price * height);
+        
+        if (historyData && historyData.length > 0) {
+          // Use real historical data from API
+          historyData.forEach((outcomeHistory, index) => {
+            const color = colors[index % colors.length];
+            const dataPoints = outcomeHistory.data || [];
             
-            if (i === 0) {
-              ctx.moveTo(x, y);
-            } else {
-              ctx.lineTo(x, y);
+            if (dataPoints.length === 0) return;
+            
+            // Find min/max timestamps for scaling
+            const timestamps = dataPoints.map(p => p.timestamp);
+            const minTime = Math.min(...timestamps);
+            const maxTime = Math.max(...timestamps);
+            const timeRange = maxTime - minTime;
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            dataPoints.forEach((point, i) => {
+              const x = ((point.timestamp - minTime) / timeRange) * width;
+              const y = height - (point.price * height);
+              
+              if (i === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
+            });
+            
+            ctx.stroke();
+          });
+        } else {
+          // Fallback to mock data if API fails
+          outcomes.forEach((outcome, index) => {
+            const color = colors[index % colors.length];
+            const basePrice = prices[index] !== undefined ? parseFloat(prices[index]) : 0.5;
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const points = 100;
+            for (let i = 0; i < points; i++) {
+              const x = (width / points) * i;
+              // Simulate price movement around base price
+              const variation = (Math.sin(i / 10) * 0.1) + (Math.random() * 0.05 - 0.025);
+              const price = Math.max(0.01, Math.min(0.99, basePrice + variation));
+              const y = height - (price * height);
+              
+              if (i === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
             }
-          }
-          
-          ctx.stroke();
-        });
+            
+            ctx.stroke();
+          });
+        }
       }
       
       // Time range selector handlers
       document.querySelectorAll('.time-selector').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           document.querySelectorAll('.time-selector').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           currentRange = btn.dataset.range;
-          drawGraph(currentRange);
+          
+          // Fetch new historical data for selected range
+          historicalData = await fetchHistoricalData(currentRange);
+          drawGraph(currentRange, historicalData);
         });
       });
       
-      drawGraph(currentRange);
+      // Initial load
+      (async () => {
+        historicalData = await fetchHistoricalData(currentRange);
+        drawGraph(currentRange, historicalData);
+      })();
     }
     
     function setupMarketDetailBuyButtons(market) {
