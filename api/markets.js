@@ -713,7 +713,7 @@ module.exports = async (req, res) => {
           const nflTagIds = [1, 450, 100639];
           console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
           for (const tagId of nflTagIds) {
-            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000`;
+            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000&minVolume=${minVolumeNum}`;
             const tagMarketsResp = await fetch(tagMarketsUrl);
             if (tagMarketsResp.ok) {
               const tagMarkets = await tagMarketsResp.json();
@@ -738,7 +738,7 @@ module.exports = async (req, res) => {
         
         // Approach 3: Search all markets for game structure
         try {
-          const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
+          const url = `${GAMMA_API}/markets?closed=false&limit=10000&minVolume=${minVolumeNum}`;
           const resp = await fetch(url);
           if (resp.ok) {
             const data = await resp.json();
@@ -1005,7 +1005,7 @@ module.exports = async (req, res) => {
       // This ensures we get a comprehensive 1:1 match with Polymarket
       try {
         // Fetch all active markets with high limit
-        const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
+        const url = `${GAMMA_API}/markets?closed=false&limit=10000&minVolume=${minVolumeNum}`;
       const resp = await fetch(url);
       if (resp.ok) {
         const data = await resp.json();
