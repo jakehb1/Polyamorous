@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     @font-face {
       font-family: 'Benzin';
@@ -19,26 +19,26 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     :root {
-      --bg: #EAF5FB;
-      --card: #d8edf8;
-      --text: #687E90;
-      --text-muted: #8a9ba8;
-      --accent: #687E90;
+      --bg: #FFFFFF;
+      --card: #f8f9fa;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --accent: #000000;
       --accent-light: #4B4B4B;
       --accent-pink: #4B4B4B;
-      --green: #4B4B4B;
-      --green-soft: #6b6b6b;
+      --green: #000000;
+      --green-soft: #1a1a1a;
       --red: #d97777;
-      --border: #c5d9e8;
-      --bg-secondary: #e0f0f8;
-      --card-hover: #c8e0f0;
+      --border: #e5e7eb;
+      --bg-secondary: #f3f4f6;
+      --card-hover: #e5e7eb;
       --radius: 24px;
       --radius-sm: 16px;
       --shadow: none;
     }
 
     body {
-      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -50,7 +50,7 @@
     .splash-screen {
       position: fixed;
       inset: 0;
-      background: var(--bg);
+      background: linear-gradient(135deg, #fff5f0 0%, #fef3f2 25%, #f5f0ff 50%, #f0f4ff 75%, #ffffff 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -70,18 +70,18 @@
       font-size: 32px;
     }
     .splash-logo-text {
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Inter', 'Montserrat', sans-serif;
       font-size: 42px;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.02em;
+      font-weight: 900;
+      color: #000000;
+      letter-spacing: -0.03em;
     }
     
     .splash-spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-top-color: #000000;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
@@ -213,7 +213,7 @@
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
-      background: var(--accent);
+      background: #000000;
       color: white;
       border: none;
       border-radius: var(--radius-sm);
@@ -727,8 +727,8 @@
       transform: scale(0.95);
     }
     .category-chip.active {
-      background: var(--green);
-      color: var(--text);
+      background: #000000;
+      color: white;
     }
     
     /* Legacy mode-chips (keeping for backward compatibility) */
@@ -951,13 +951,12 @@
       opacity: 0.8;
     }
     .event-price-btn-1 {
-      background: var(--accent);
+      background: #000000;
       color: white;
     }
     .event-price-btn-2 {
-      background: var(--bg-secondary);
-      color: var(--text);
-      border: 1px solid var(--border);
+      background: #000000;
+      color: white;
     }
     .event-markets {
       padding: 0;
@@ -1314,7 +1313,7 @@
       font-size: 16px;
       font-weight: 600;
       font-family: inherit;
-      background: var(--accent);
+      background: #000000;
       color: white;
       border: none;
       border-radius: 30px;
@@ -1493,9 +1492,9 @@
       border-color: var(--accent);
     }
     .time-selector.active {
-      background: var(--accent);
-      color: #EAF5FB;
-      border-color: var(--accent);
+      background: #000000;
+      color: white;
+      border-color: #000000;
     }
     .market-detail-selected-outcome {
       display: flex;
@@ -1549,13 +1548,12 @@
       transform: scale(0.98);
     }
     .buy-btn-yes {
-      background: var(--green);
+      background: #000000;
       color: white;
     }
     .buy-btn-no {
-      background: var(--bg);
-      color: var(--text);
-      border: 2px solid var(--border);
+      background: #000000;
+      color: white;
     }
     .buy-btn-label {
       font-size: 11px;
