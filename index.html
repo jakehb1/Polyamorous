@@ -2875,6 +2875,49 @@
     // =====================
     // MARKETS
     // =====================
+    // Get current NFL week (NFL season typically starts in early September)
+    function getCurrentNFLWeek() {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      
+      // NFL season typically starts around September 5-10 (Week 1)
+      // Calculate approximate start date (first Thursday of September)
+      let seasonStart = new Date(currentYear, 8, 1); // September 1st
+      // Find first Thursday in September
+      while (seasonStart.getDay() !== 4) { // 4 = Thursday
+        seasonStart.setDate(seasonStart.getDate() + 1);
+      }
+      // Adjust to September 5-10 range (typical NFL season start)
+      if (seasonStart.getDate() < 5) {
+        seasonStart.setDate(5);
+      } else if (seasonStart.getDate() > 10) {
+        seasonStart.setDate(5);
+      }
+      
+      // If we're before the season start, check previous year
+      if (now < seasonStart) {
+        seasonStart = new Date(currentYear - 1, 8, 1);
+        while (seasonStart.getDay() !== 4) {
+          seasonStart.setDate(seasonStart.getDate() + 1);
+        }
+        if (seasonStart.getDate() < 5) {
+          seasonStart.setDate(5);
+        } else if (seasonStart.getDate() > 10) {
+          seasonStart.setDate(5);
+        }
+      }
+      
+      // Calculate weeks since season start (each week is 7 days)
+      const daysDiff = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+      const weekNum = Math.floor(daysDiff / 7) + 1;
+      
+      // Clamp to valid NFL weeks (1-18 for regular season, 19-22 for playoffs)
+      if (weekNum < 1) return 1;
+      if (weekNum > 22) return null; // Season ended
+      
+      return weekNum;
+    }
+
     async function fetchMarkets(kind = 'trending', sportType = null) {
       const list = document.getElementById('marketsList');
       list.innerHTML = '<div class="loading">Loading markets...</div>';
@@ -2887,6 +2930,14 @@
         let apiUrl = `/api/markets?kind=${kind}&limit=1000&platform=${state.selectedPlatform || 'polymarket'}`;
         if (sportType) {
           apiUrl += `&sportType=${sportType}`;
+        }
+        // For NFL games, add current week parameter
+        if (kind.toLowerCase() === 'nfl' && sportType === 'games') {
+          const currentWeek = getCurrentNFLWeek();
+          if (currentWeek) {
+            apiUrl += `&week=${currentWeek}`;
+            console.log('[fetchMarkets] Filtering NFL games by week:', currentWeek);
+          }
         }
         console.log('[fetchMarkets] URL:', apiUrl);
         

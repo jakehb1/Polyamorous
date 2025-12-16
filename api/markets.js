@@ -42,6 +42,65 @@ function setCache(key, data) {
   }
 }
 
+// Extract week number from text (e.g., "week 13", "week-13", "week13")
+function extractWeekNumber(text) {
+  if (!text) return null;
+  const textLower = String(text).toLowerCase();
+  // Match patterns like "week 13", "week-13", "week13", "w13"
+  const weekMatch = textLower.match(/\b(?:week[\s\-]?|w)(\d{1,2})\b/);
+  if (weekMatch && weekMatch[1]) {
+    const weekNum = parseInt(weekMatch[1], 10);
+    if (weekNum >= 1 && weekNum <= 18) { // NFL regular season is 18 weeks
+      return weekNum;
+    }
+  }
+  return null;
+}
+
+// Get current NFL week based on date
+// NFL season typically starts in early September (week 1)
+function getCurrentNFLWeek() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  
+  // NFL season typically starts around September 5-10 (Week 1)
+  // Calculate approximate start date (first Thursday of September)
+  let seasonStart = new Date(currentYear, 8, 1); // September 1st
+  // Find first Thursday in September
+  while (seasonStart.getDay() !== 4) { // 4 = Thursday
+    seasonStart.setDate(seasonStart.getDate() + 1);
+  }
+  // Adjust to September 5-10 range (typical NFL season start)
+  if (seasonStart.getDate() < 5) {
+    seasonStart.setDate(5);
+  } else if (seasonStart.getDate() > 10) {
+    seasonStart.setDate(5);
+  }
+  
+  // If we're before the season start, check previous year
+  if (now < seasonStart) {
+    seasonStart = new Date(currentYear - 1, 8, 1);
+    while (seasonStart.getDay() !== 4) {
+      seasonStart.setDate(seasonStart.getDate() + 1);
+    }
+    if (seasonStart.getDate() < 5) {
+      seasonStart.setDate(5);
+    } else if (seasonStart.getDate() > 10) {
+      seasonStart.setDate(5);
+    }
+  }
+  
+  // Calculate weeks since season start (each week is 7 days)
+  const daysDiff = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+  const weekNum = Math.floor(daysDiff / 7) + 1;
+  
+  // Clamp to valid NFL weeks (1-18 for regular season, 19-22 for playoffs)
+  if (weekNum < 1) return 1;
+  if (weekNum > 22) return null; // Season ended
+  
+  return weekNum;
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -50,7 +109,7 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
 
-  const { kind = "trending", limit = "1000", sportType = null, platform = "polymarket" } = req.query;
+  const { kind = "trending", limit = "1000", sportType = null, platform = "polymarket", week = null } = req.query;
   
   // Route to appropriate platform handler
   const platformLower = (platform || "polymarket").toLowerCase();
@@ -1028,8 +1087,11 @@ module.exports = async (req, res) => {
                 'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
               ];
               
+              // Determine target week: use provided week parameter, or default to current week
+              const targetWeek = week ? parseInt(week, 10) : getCurrentNFLWeek();
+              
               console.log("[markets] Searching", allEvents.length, "events for NFL games");
-              console.log("[markets] Current NFL week:", currentWeek);
+              console.log("[markets] Target NFL week:", targetWeek, week ? "(specified)" : "(current)");
               console.log("[markets] Filtering for sportType:", sportType);
               let checkedCount = 0;
               let matchedCount = 0;
@@ -1073,14 +1135,16 @@ module.exports = async (req, res) => {
                 
                 // Extract week number from event
                 const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug) ||
-                                 (eventTags.find(t => t.includes('week')) ? extractWeekNumber(eventTags.find(t => t.includes('week'))) : null);
+                                 (eventTags.find(t => String(t).includes('week')) ? extractWeekNumber(String(eventTags.find(t => String(t).includes('week')))) : null);
                 
-                // Filter by current week - be more permissive to show all relevant games
-                if (eventWeek !== null) {
-                  // Include if week matches current week or is within 4 weeks ahead/behind (more permissive)
-                  if (eventWeek < currentWeek - 4 || eventWeek > currentWeek + 4) {
-                    continue; // Skip games from past weeks or too far in future
-                  }
+                // Filter by target week if specified (only include events from that week)
+                if (targetWeek !== null && eventWeek !== null && eventWeek !== targetWeek) {
+                  continue; // Skip events from other weeks
+                }
+                
+                // If we have a week filter but event has no week info, skip it (strict filtering)
+                if (targetWeek !== null && eventWeek === null) {
+                  continue; // Skip events without week information when filtering by week
                 }
                 
                 // Filter by event start date - only exclude games that are clearly in the past
