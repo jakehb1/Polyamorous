@@ -2914,6 +2914,14 @@
         
         if (markets.length > 0) {
           console.log('[fetchMarkets] First market:', markets[0]);
+          console.log('[fetchMarkets] Sample market structure:', {
+            hasEventId: !!markets[0]?.eventId,
+            hasEventTitle: !!markets[0]?.eventTitle,
+            question: markets[0]?.question,
+            eventTitle: markets[0]?.eventTitle,
+            outcomes: markets[0]?.outcomes,
+            outcomePrices: markets[0]?.outcomePrices
+          });
           state.markets = markets;
           renderMarkets(markets);
         } else {
@@ -2934,9 +2942,15 @@
     function renderMarkets(markets) {
       const list = document.getElementById('marketsList');
       
+      console.log('[renderMarkets] Rendering', markets.length, 'markets');
+      console.log('[renderMarkets] selectedCategory:', state.selectedCategory);
+      console.log('[renderMarkets] Markets with event data:', markets.filter(m => m.eventId && m.eventTitle).length);
+      
       // Check if we should group by events (for NFL games)
       const shouldGroupByEvent = state.selectedCategory === 'nfl' && 
                                   markets.some(m => m.eventId && m.eventTitle);
+      
+      console.log('[renderMarkets] shouldGroupByEvent:', shouldGroupByEvent);
       
       if (shouldGroupByEvent && markets.length > 0) {
         // Group markets by event
