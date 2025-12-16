@@ -3043,7 +3043,7 @@
         });
         
         // Calculate total volume for each event (use event volume if available, otherwise sum all market volumes)
-        let sortedEvents = Array.from(eventsMap.values()).map(event => {
+        let eventsWithVolume = Array.from(eventsMap.values()).map(event => {
           // Use eventVolume if available (this is the total volume from Polymarket API)
           // Otherwise, sum all market volumes (use volume, not volume24hr, for total event volume)
           let totalVol = 0;
@@ -3059,11 +3059,49 @@
           return { ...event, totalVolume: totalVol };
         });
         
-        // Sort events by total volume (highest first)
-        sortedEvents.sort((a, b) => b.totalVolume - a.totalVolume);
+        // Group events by date (like Polymarket does)
+        const eventsByDate = new Map();
+        eventsWithVolume.forEach(event => {
+          let dateKey = 'Unknown Date';
+          if (event.eventStartDate) {
+            const eventDate = new Date(event.eventStartDate);
+            // Format as "Thu, December 18" or "Sat, December 20"
+            const options = { weekday: 'short', month: 'long', day: 'numeric' };
+            dateKey = eventDate.toLocaleDateString('en-US', options);
+            // Also store the date object for sorting
+            event._dateObj = eventDate;
+          } else {
+            event._dateObj = new Date(0); // Put events without dates at the end
+          }
+          
+          if (!eventsByDate.has(dateKey)) {
+            eventsByDate.set(dateKey, []);
+          }
+          eventsByDate.get(dateKey).push(event);
+        });
         
-        // Render events with their markets
-        list.innerHTML = sortedEvents.map(event => {
+        // Sort dates chronologically (earliest first)
+        const sortedDateKeys = Array.from(eventsByDate.keys()).sort((a, b) => {
+          const dateA = eventsByDate.get(a)[0]._dateObj;
+          const dateB = eventsByDate.get(b)[0]._dateObj;
+          return dateA - dateB;
+        });
+        
+        // Sort events within each date by volume (highest first)
+        sortedDateKeys.forEach(dateKey => {
+          eventsByDate.get(dateKey).sort((a, b) => b.totalVolume - a.totalVolume);
+        });
+        
+        // Render events grouped by date
+        list.innerHTML = sortedDateKeys.map(dateKey => {
+          const eventsForDate = eventsByDate.get(dateKey);
+          
+          return `
+            <div class="date-group" style="margin-bottom: 24px;">
+              <div class="date-header" style="font-size: 14px; font-weight: 600; color: var(--text-muted); padding: 8px 16px; border-bottom: 1px solid var(--border); margin-bottom: 0;">
+                ${dateKey}
+              </div>
+              ${eventsForDate.map(event => {
           const eventVol = event.totalVolume;
           const eventImg = event.eventImage || event.markets[0]?.image || '';
           const hasImage = eventImg && eventImg.trim() !== '';
@@ -3132,6 +3170,9 @@
                   `;
                 }).join('')}
               </div>
+            </div>
+          `;
+              }).join('')}
             </div>
           `;
         }).join('');
