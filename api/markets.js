@@ -999,20 +999,34 @@ module.exports = async (req, res) => {
           }
           
           if (Array.isArray(allEvents) && allEvents.length > 0) {
-              // NFL team names for matching (including abbreviations)
-              const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
-                               'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
-                               'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
-                               'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
-                               'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
-                               'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
-                               'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
-                               'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
-                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
-                               // Team abbreviations
-                               'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
-                               'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
-                               'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
+              // Official NFL teams only (32 teams)
+              // AFC East: Bills, Dolphins, Patriots, Jets
+              // AFC North: Ravens, Bengals, Browns, Steelers
+              // AFC South: Texans, Colts, Jaguars, Titans
+              // AFC West: Broncos, Chiefs, Raiders, Chargers
+              // NFC East: Cowboys, Giants, Eagles, Commanders
+              // NFC North: Bears, Lions, Packers, Vikings
+              // NFC South: Falcons, Panthers, Saints, Buccaneers
+              // NFC West: Cardinals, Rams, 49ers, Seahawks
+              const nflTeams = [
+                // Team names
+                'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
+                'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
+                'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
+                'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
+                'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
+                'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
+                'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
+                'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
+                // City names (for context matching)
+                'buffalo', 'miami', 'new england', 'new york', 'baltimore', 'cincinnati', 'cleveland', 'pittsburgh',
+                'houston', 'indianapolis', 'jacksonville', 'tennessee', 'denver', 'kansas city', 'las vegas', 'los angeles',
+                'dallas', 'philadelphia', 'washington', 'chicago', 'detroit', 'green bay', 'minnesota', 'atlanta',
+                'carolina', 'new orleans', 'tampa', 'tampa bay', 'arizona', 'san francisco', 'seattle',
+                // Team abbreviations
+                'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
+                'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
+              ];
               
               console.log("[markets] Searching", allEvents.length, "events for NFL games");
               console.log("[markets] Current NFL week:", currentWeek);
@@ -1534,11 +1548,36 @@ module.exports = async (req, res) => {
     if (sportType === "games" && isSportsSubcategory && kind.toLowerCase() === "nfl") {
       // First pass: Filter out non-NFL sports before other checks
       const beforeSportFilter = markets.length;
-      const nflTeamKeywords = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
-                               'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
-                               'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
-                               'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
-                               'giants', 'eagles', 'bears', 'vikings'];
+      // Official NFL teams only (32 teams)
+      // AFC East: Bills, Dolphins, Patriots, Jets
+      // AFC North: Ravens, Bengals, Browns, Steelers
+      // AFC South: Texans, Colts, Jaguars, Titans
+      // AFC West: Broncos, Chiefs, Raiders, Chargers
+      // NFC East: Cowboys, Giants, Eagles, Commanders
+      // NFC North: Bears, Lions, Packers, Vikings
+      // NFC South: Falcons, Panthers, Saints, Buccaneers
+      // NFC West: Cardinals, Rams, 49ers, Seahawks
+      const nflTeamKeywords = [
+        // AFC East
+        'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
+        // AFC North
+        'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
+        // AFC South
+        'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
+        // AFC West
+        'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
+        // NFC East
+        'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
+        // NFC North
+        'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
+        // NFC South
+        'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
+        // NFC West
+        'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
+        // Team abbreviations
+        'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
+        'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
+      ];
       const nonNflSports = ['college football', 'cfb', 'ncaa', 'dota', 'esports', 'serie a', 'ac milan', 
                            'hellas verona', 'premier league', 'la liga', 'bundesliga', 'nba', 'mlb', 'nhl', 
                            'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 
@@ -1752,18 +1791,34 @@ module.exports = async (req, res) => {
     
     // Final filtering for NFL games: remove props, keep game markets
     if (kind.toLowerCase() === "nfl" && sportType === "games") {
-      const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
-                        'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
-                        'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
-                        'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
-                        'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
-                        'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
-                        'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
-                        'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
-                        'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
-                        'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
-                        'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
-                        'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
+      // Official NFL teams only (32 teams) - full names and abbreviations
+      // AFC East: Bills, Dolphins, Patriots, Jets
+      // AFC North: Ravens, Bengals, Browns, Steelers
+      // AFC South: Texans, Colts, Jaguars, Titans
+      // AFC West: Broncos, Chiefs, Raiders, Chargers
+      // NFC East: Cowboys, Giants, Eagles, Commanders
+      // NFC North: Bears, Lions, Packers, Vikings
+      // NFC South: Falcons, Panthers, Saints, Buccaneers
+      // NFC West: Cardinals, Rams, 49ers, Seahawks
+      const nflTeams = [
+        // Team names
+        'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
+        'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
+        'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
+        'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
+        'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
+        'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
+        'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
+        'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
+        // City names (for context matching)
+        'buffalo', 'miami', 'new england', 'new york', 'baltimore', 'cincinnati', 'cleveland', 'pittsburgh',
+        'houston', 'indianapolis', 'jacksonville', 'tennessee', 'denver', 'kansas city', 'las vegas', 'los angeles',
+        'dallas', 'philadelphia', 'washington', 'chicago', 'detroit', 'green bay', 'minnesota', 'atlanta',
+        'carolina', 'new orleans', 'tampa', 'tampa bay', 'arizona', 'san francisco', 'seattle',
+        // Team abbreviations
+        'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
+        'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
+      ];
       
       console.log("[markets] Filtering", markets.length, "markets for NFL games (removing props)");
       
