@@ -2873,9 +2873,6 @@
       list.innerHTML = '<div class="loading">Loading markets...</div>';
 
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2588',message:'fetchMarkets called',data:{kind, sportType, selectedCategory: state.selectedCategory},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType, 'platform:', state.selectedPlatform);
         // Reduce limit for faster loading - 1000 markets is plenty for initial display
         // Only show markets with volume - filter out zero-volume markets (use $0.01 minimum)
@@ -2886,9 +2883,6 @@
         }
         console.log('[fetchMarkets] URL:', apiUrl);
         
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2596',message:'API request URL',data:{apiUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         const resp = await fetch(apiUrl);
         console.log('[fetchMarkets] Status:', resp.status, resp.statusText);
         
@@ -2919,9 +2913,6 @@
         const markets = data.markets || [];
         
         if (markets.length > 0) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2617',message:'Markets before render',data:{marketCount: markets.length, sampleMarkets: markets.slice(0, 3).map(m => ({question: m.question, eventTitle: m.eventTitle, volume: m.volume24hr}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           console.log('[fetchMarkets] First market:', markets[0]);
           state.markets = markets;
           renderMarkets(markets);
@@ -2930,9 +2921,6 @@
           list.innerHTML = `<div class="loading">No markets found. <br><small style="color:var(--text-muted)">API responded but returned 0 markets</small></div>`;
         }
       } catch (err) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2625',message:'fetchMarkets error',data:{error: err.message, stack: err.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         console.error('[fetchMarkets] Error:', err);
         list.innerHTML = `
           <div class="loading" style="color:#d97777;">

@@ -1782,6 +1782,16 @@ module.exports = async (req, res) => {
         console.log("[markets] 1. Games aren't in the API yet");
         console.log("[markets] 2. Games are structured differently than expected");
         console.log("[markets] 3. Filtering is too strict");
+        console.log("[markets] Sample of markets that were filtered out (from earlier in pipeline):");
+        // Note: We can't access the original markets here, but the earlier logging should have shown them
+      }
+      
+      // If we still have markets after filtering, log a sample
+      if (markets.length > 0) {
+        console.log("[markets] Sample of remaining game markets (first 5):");
+        for (const m of markets.slice(0, 5)) {
+          console.log(`  - "${m.question || 'N/A'}" (Event: ${m.eventTitle || 'N/A'})`);
+        }
       }
     }
 
