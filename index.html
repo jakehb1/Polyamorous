@@ -986,11 +986,11 @@
       opacity: 0.8;
     }
     .event-price-btn-1 {
-      background: #000000;
+      background: var(--market-color, #003366);
       color: white;
     }
     .event-price-btn-2 {
-      background: #000000;
+      background: var(--market-color, #003366);
       color: white;
     }
     .event-markets {
@@ -1131,20 +1131,20 @@
       transform: scale(0.95);
     }
     .outcome-yes {
-      background: var(--accent-pink);
+      background: var(--market-color, #003366);
       color: white;
-      border-color: var(--accent-pink);
+      border-color: var(--market-color, #003366);
     }
     .outcome-yes:active {
       opacity: 0.9;
     }
     .outcome-no {
-      background: var(--bg);
-      color: var(--text);
-      border-color: var(--border);
+      background: var(--market-color, #003366);
+      color: white;
+      border-color: var(--market-color, #003366);
     }
     .outcome-no:active {
-      background: var(--card);
+      opacity: 0.9;
     }
     .market-card-footer {
       display: flex;
@@ -1263,12 +1263,23 @@
       cursor: pointer;
       border: none;
       transition: all 0.2s;
-      background: var(--bg);
+      background: var(--market-color, #003366);
+      color: white;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     .trade-outcome.active { 
-      background: var(--green-soft);
-      box-shadow: 0 2px 6px rgba(75, 75, 75, 0.2);
+      background: #000000;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .trade-outcome .trade-outcome-label,
+    .trade-outcome .trade-outcome-percent,
+    .trade-outcome .trade-outcome-price {
+      color: white;
+    }
+    .trade-outcome.active .trade-outcome-label,
+    .trade-outcome.active .trade-outcome-percent {
+      color: white;
     }
     .trade-outcome-left {
       display: flex;
@@ -1292,12 +1303,9 @@
     .trade-outcome-price {
       font-size: 18px;
       font-weight: 700;
-      color: var(--green);
+      color: white;
       min-width: 60px;
       text-align: right;
-    }
-    .trade-outcome.active .trade-outcome-price {
-      color: var(--accent);
     }
     
     .trade-amount {
@@ -1583,11 +1591,11 @@
       transform: scale(0.98);
     }
     .buy-btn-yes {
-      background: #000000;
+      background: var(--market-color, #003366);
       color: white;
     }
     .buy-btn-no {
-      background: #000000;
+      background: var(--market-color, #003366);
       color: white;
     }
     .buy-btn-label {
@@ -2057,6 +2065,180 @@
       if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
       if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
       return `$${num.toFixed(0)}`;
+    }
+
+    /**
+     * NFL Team Colors Mapping
+     * Primary colors for each NFL team
+     */
+    const NFL_TEAM_COLORS = {
+      // NFC
+      'rams': '#003594', // Rams Blue
+      'los angeles rams': '#003594',
+      'lar': '#003594',
+      '49ers': '#AA0000', // 49ers Red
+      'san francisco 49ers': '#AA0000',
+      'sf': '#AA0000',
+      'cowboys': '#003594', // Cowboys Blue
+      'dallas cowboys': '#003594',
+      'packers': '#203731', // Packers Green
+      'green bay packers': '#203731',
+      'bears': '#0B162A', // Bears Navy
+      'chicago bears': '#0B162A',
+      'vikings': '#4F2683', // Vikings Purple
+      'minnesota vikings': '#4F2683',
+      'lions': '#0076B6', // Lions Blue
+      'detroit lions': '#0076B6',
+      'saints': '#D3BC8D', // Saints Gold
+      'new orleans saints': '#D3BC8D',
+      'falcons': '#A71930', // Falcons Red
+      'atlanta falcons': '#A71930',
+      'panthers': '#0085CA', // Panthers Blue
+      'carolina panthers': '#0085CA',
+      'buccaneers': '#D50A0A', // Bucs Red
+      'tampa bay buccaneers': '#D50A0A',
+      'cardinals': '#97233F', // Cardinals Red
+      'arizona cardinals': '#97233F',
+      'seahawks': '#002244', // Seahawks Blue
+      'seattle seahawks': '#002244',
+      'commanders': '#5A1414', // Commanders Burgundy
+      'washington commanders': '#5A1414',
+      'giants': '#0B2265', // Giants Blue
+      'new york giants': '#0B2265',
+      'eagles': '#004C54', // Eagles Green
+      'philadelphia eagles': '#004C54',
+      
+      // AFC
+      'broncos': '#FB4F14', // Broncos Orange
+      'denver broncos': '#FB4F14',
+      'chiefs': '#E31837', // Chiefs Red
+      'kansas city chiefs': '#E31837',
+      'raiders': '#000000', // Raiders Black
+      'las vegas raiders': '#000000',
+      'chargers': '#0080C6', // Chargers Blue
+      'los angeles chargers': '#0080C6',
+      'patriots': '#002244', // Patriots Blue
+      'new england patriots': '#002244',
+      'jets': '#125740', // Jets Green
+      'new york jets': '#125740',
+      'bills': '#00338D', // Bills Blue
+      'buffalo bills': '#00338D',
+      'dolphins': '#008E97', // Dolphins Teal
+      'miami dolphins': '#008E97',
+      'ravens': '#241773', // Ravens Purple
+      'baltimore ravens': '#241773',
+      'bengals': '#FB4F14', // Bengals Orange
+      'cincinnati bengals': '#FB4F14',
+      'browns': '#311D00', // Browns Brown
+      'cleveland browns': '#311D00',
+      'steelers': '#FFB612', // Steelers Gold
+      'pittsburgh steelers': '#FFB612',
+      'texans': '#03202F', // Texans Navy
+      'houston texans': '#03202F',
+      'colts': '#002C5F', // Colts Blue
+      'indianapolis colts': '#002C5F',
+      'jaguars': '#006778', // Jaguars Teal
+      'jacksonville jaguars': '#006778',
+      'titans': '#0C2340', // Titans Navy
+      'tennessee titans': '#0C2340',
+    };
+
+    /**
+     * Extract team name from text (case-insensitive)
+     */
+    function extractTeamName(text) {
+      if (!text) return null;
+      const lowerText = text.toLowerCase();
+      
+      // Check for exact team name matches
+      for (const [teamName, color] of Object.entries(NFL_TEAM_COLORS)) {
+        if (lowerText.includes(teamName)) {
+          return teamName;
+        }
+      }
+      
+      return null;
+    }
+
+    /**
+     * Get team color for an outcome
+     * Returns the team color if the outcome represents a team, otherwise returns market color
+     */
+    function getOutcomeColor(market, outcome, outcomeIndex) {
+      if (!market || !outcome) return '#003366'; // Default blue
+      
+      const outcomeLower = outcome.toLowerCase().trim();
+      const questionLower = (market.question || '').toLowerCase();
+      
+      // First, try to extract team name directly from the outcome text
+      let teamName = extractTeamName(outcomeLower);
+      if (teamName && NFL_TEAM_COLORS[teamName]) {
+        return NFL_TEAM_COLORS[teamName];
+      }
+      
+      // If not found in outcome, try the full market question + outcome context
+      const marketText = `${questionLower} ${outcomeLower}`;
+      teamName = extractTeamName(marketText);
+      if (teamName && NFL_TEAM_COLORS[teamName]) {
+        return NFL_TEAM_COLORS[teamName];
+      }
+      
+      // For markets with "vs" or team names in question, try to match outcome position
+      // If question has teams and outcomes are positional (first/second outcome = first/second team)
+      if (questionLower.includes(' vs ') || questionLower.includes(' vs. ')) {
+        const teamsInQuestion = [];
+        for (const [teamNameKey, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (questionLower.includes(teamNameKey)) {
+            teamsInQuestion.push({ name: teamNameKey, color });
+          }
+        }
+        // If we found teams and outcomes match positionally
+        if (teamsInQuestion.length >= 2 && outcomeIndex < teamsInQuestion.length) {
+          return teamsInQuestion[outcomeIndex].color;
+        } else if (teamsInQuestion.length === 1 && outcomeIndex === 0) {
+          // First outcome uses first team's color
+          return teamsInQuestion[0].color;
+        }
+      }
+      
+      // Fallback: generate color based on market for consistency
+      const seed = `${market.id || market.conditionId || market.question || 'default'}_${outcomeIndex}`;
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      
+      const hue = 200 + (Math.abs(hash) % 40);
+      const saturation = 60 + (Math.abs(hash) % 25);
+      const lightness = 35 + (Math.abs(hash) % 15);
+      
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
+
+    /**
+     * Generate a deterministic color for a market based on market data
+     * Returns a blue-ish color (matching Polymarket's pattern)
+     * Uses market ID or question to ensure consistent colors
+     */
+    function getMarketColor(market) {
+      if (!market) return '#003366'; // Default blue
+      
+      // Use market ID or question to generate consistent color
+      const seed = market.id || market.conditionId || market.question || 'default';
+      
+      // Simple hash function to convert seed to number
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      
+      // Generate blue color palette (similar to Polymarket's blue theme)
+      // Use different shades of blue based on hash
+      const hue = 200 + (hash % 40); // Blue range: 200-240
+      const saturation = 60 + (hash % 25); // 60-85%
+      const lightness = 35 + (hash % 15); // 35-50% (darker blues)
+      
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
     }
 
     // =====================
@@ -2636,7 +2818,8 @@
         console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType, 'platform:', state.selectedPlatform);
         // Reduce limit for faster loading - 1000 markets is plenty for initial display
         // Only show markets with volume - filter out zero-volume markets (use $0.01 minimum)
-        let apiUrl = `/api/markets?kind=${kind}&limit=1000&minVolume=0.01&platform=${state.selectedPlatform || 'polymarket'}`;
+        // Don't filter by volume by default - show all active markets to match Polymarket
+        let apiUrl = `/api/markets?kind=${kind}&limit=1000&platform=${state.selectedPlatform || 'polymarket'}`;
         if (sportType) {
           apiUrl += `&sportType=${sportType}`;
         }
@@ -2649,9 +2832,20 @@
         console.log('[fetchMarkets] Status:', resp.status, resp.statusText);
         
         if (!resp.ok) {
-          const errorText = await resp.text();
-          console.error('[fetchMarkets] Error response:', errorText);
-          throw new Error(`HTTP ${resp.status}: ${errorText.substring(0, 100)}`);
+          let errorData;
+          try {
+            errorData = await resp.json();
+          } catch (e) {
+            const errorText = await resp.text();
+            throw new Error(`HTTP ${resp.status}: ${errorText.substring(0, 100)}`);
+          }
+          
+          // Handle Kalshi authentication/configuration errors
+          if (resp.status === 503 && errorData.requiresAuth && state.selectedPlatform === 'kalshi') {
+            throw new Error('Kalshi API requires authentication. Please configure KALSHI_ACCESS_KEY and KALSHI_PRIVATE_KEY environment variables.');
+          }
+          
+          throw new Error(errorData.message || errorData.error || `HTTP ${resp.status}`);
         }
         
         const data = await resp.json();
@@ -2768,12 +2962,14 @@
                   ${primaryPrices.length >= 2 ? `
                     <button class="event-price-btn event-price-btn-1" 
                             data-market-id="${moneylineMarket?.id}" 
-                            data-outcome-index="0">
+                            data-outcome-index="0"
+                            style="background: ${getOutcomeColor(moneylineMarket, outcome1, 0)}; color: white; border-color: ${getOutcomeColor(moneylineMarket, outcome1, 0)};">
                       ${outcome1} ${price1}
                     </button>
                     <button class="event-price-btn event-price-btn-2" 
                             data-market-id="${moneylineMarket?.id}" 
-                            data-outcome-index="1">
+                            data-outcome-index="1"
+                            style="background: ${getOutcomeColor(moneylineMarket, outcome2, 1)}; color: white; border-color: ${getOutcomeColor(moneylineMarket, outcome2, 1)};">
                       ${outcome2} ${price2}
                     </button>
                   ` : ''}
@@ -2786,19 +2982,25 @@
                   const outcomes = m.outcomes || ["Yes", "No"];
                   const vol = m.volume24hr || m.volume || 0;
                   
+                  // Get market color for this market
+                  const marketColor = getMarketColor(m);
+                  
                   return `
-                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="cursor: pointer;">
+                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="cursor: pointer; --market-color: ${marketColor};">
                       <div class="outcome-label">${m.question}</div>
                       <div class="outcome-buttons">
                         ${outcomes.map((outcome, idx) => {
                           const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
                           const isYes = outcome.toLowerCase() === 'yes' || idx === 0;
+                          // Get team-specific color for this outcome
+                          const outcomeColor = getOutcomeColor(m, outcome, idx);
                           return `
                             <div class="outcome-button-group">
                               <span class="outcome-price">${price}</span>
                               <button class="outcome-btn ${isYes ? 'outcome-yes' : 'outcome-no'}" 
                                       data-market-id="${m.id}" 
-                                      data-outcome-index="${idx}">
+                                      data-outcome-index="${idx}"
+                                      style="background: ${outcomeColor}; color: white; border-color: ${outcomeColor};">
                                 ${outcome}
                               </button>
                             </div>
@@ -2821,8 +3023,11 @@
           const imgUrl = m.image || m.eventImage || m.icon || '';
           const hasImage = imgUrl && imgUrl.trim() !== '';
         
+        // Get market color for this market
+        const marketColor = getMarketColor(m);
+        
         return `
-            <div class="market-card" data-id="${m.id}">
+            <div class="market-card" data-id="${m.id}" style="--market-color: ${marketColor};">
               <div class="market-card-header">
                 ${hasImage ? `<img class="market-image" src="${imgUrl}" alt="" onerror="this.classList.add('hidden')" />` : ''}
                 <div class="market-title">${m.question}</div>
@@ -2982,7 +3187,18 @@
       const outcomesList = document.getElementById('marketDetailOutcomesList');
       const outcomes = market.outcomes || ["Yes", "No"];
       const prices = market.outcomePrices || [];
-      const colors = ['blue', 'green', 'orange', 'red', 'purple', 'pink'];
+      
+      // Get market color for dynamic theming
+      const marketColor = getMarketColor(market);
+      const marketDetailView = document.getElementById('marketDetailView');
+      if (marketDetailView) {
+        marketDetailView.style.setProperty('--market-color', marketColor);
+      }
+      
+      // Use market color with variations for different outcomes
+      const baseColor = marketColor;
+      // Convert HSL to RGB for manipulation (simplified - using the market color directly)
+      const colors = [baseColor, baseColor]; // Use same color for now, can add variations later
       
       outcomesList.innerHTML = outcomes.map((outcome, index) => {
         const price = prices[index] !== undefined ? parseFloat(prices[index]) : 0.5;
@@ -3272,14 +3488,21 @@
       
       // Setup Yes button (first outcome)
       const buyYesBtn = document.getElementById('marketDetailBuyYes');
-      const yesPrice = prices[0] !== undefined ? (parseFloat(prices[0]) * 100).toFixed(0) : '50';
-      document.getElementById('buyYesOutcome').textContent = outcomes[0] || 'Yes';
+      const yesIndex = 0;
+      const yesPrice = prices[yesIndex] !== undefined ? (parseFloat(prices[yesIndex]) * 100).toFixed(0) : '50';
+      const yesOutcome = outcomes[yesIndex] || 'Yes';
+      document.getElementById('buyYesOutcome').textContent = yesOutcome;
       document.getElementById('buyYesPrice').textContent = `${yesPrice}¢`;
+      
+      // Apply team-specific color to Yes button
+      const yesColor = getOutcomeColor(market, yesOutcome, yesIndex);
+      buyYesBtn.style.background = yesColor;
+      buyYesBtn.style.borderColor = yesColor;
       
       buyYesBtn.addEventListener('click', () => {
         hapticFeedback('medium');
-        state.selectedOutcomeIndex = 0;
-        state.tradeSide = outcomes[0] || 'Yes';
+        state.selectedOutcomeIndex = yesIndex;
+        state.tradeSide = yesOutcome;
         closeMarketDetail();
         openTradeModal(market);
       });
@@ -3288,13 +3511,19 @@
       const buyNoBtn = document.getElementById('marketDetailBuyNo');
       const noIndex = outcomes.length > 1 ? 1 : 0;
       const noPrice = prices[noIndex] !== undefined ? (parseFloat(prices[noIndex]) * 100).toFixed(0) : '50';
-      document.getElementById('buyNoOutcome').textContent = outcomes[noIndex] || 'No';
+      const noOutcome = outcomes[noIndex] || 'No';
+      document.getElementById('buyNoOutcome').textContent = noOutcome;
       document.getElementById('buyNoPrice').textContent = `${noPrice}¢`;
+      
+      // Apply team-specific color to No button
+      const noColor = getOutcomeColor(market, noOutcome, noIndex);
+      buyNoBtn.style.background = noColor;
+      buyNoBtn.style.borderColor = noColor;
       
       buyNoBtn.addEventListener('click', () => {
         hapticFeedback('medium');
         state.selectedOutcomeIndex = noIndex;
-        state.tradeSide = outcomes[noIndex] || 'No';
+        state.tradeSide = noOutcome;
         closeMarketDetail();
         openTradeModal(market);
       });
@@ -3345,6 +3574,15 @@
         state.selectedOutcomeIndex = outcomeIndex;
       }
 
+      // Get market color (dynamic based on market data)
+      const marketColor = getMarketColor(market);
+      
+      // Apply market color to modal via CSS custom property
+      const tradeModal = document.getElementById('tradeModal');
+      if (tradeModal) {
+        tradeModal.style.setProperty('--market-color', marketColor);
+      }
+
       // Get all outcomes and prices
       const outcomes = market.outcomes || ["Yes", "No"];
       const prices = market.outcomePrices || [];
@@ -3362,17 +3600,24 @@
       
       // Render all outcomes with percentages
       const outcomesContainer = document.getElementById('tradeOutcomes');
+      const defaultIndex = outcomeIndex !== undefined ? outcomeIndex : 0;
       outcomesContainer.innerHTML = outcomes.map((outcome, index) => {
         // Use 0.5 as fallback to match updateTradeSummary logic
         const price = prices[index] ? parseFloat(prices[index]) : 0.5;
         const percent = (price * 100).toFixed(0);
         const priceCents = (price * 100).toFixed(0);
-        const isActive = index === 0; // Default to first outcome
+        const isActive = index === defaultIndex;
+        
+        // Get team-specific color for this outcome
+        const outcomeColor = getOutcomeColor(market, outcome, index);
+        const buttonStyle = !isActive ? `style="background: ${outcomeColor}; color: white;"` : '';
         
         return `
           <div class="trade-outcome ${isActive ? 'active' : ''}" 
                data-outcome-index="${index}" 
-               data-outcome="${outcome}">
+               data-outcome="${outcome}"
+               data-outcome-color="${outcomeColor}"
+               ${buttonStyle}>
             <div class="trade-outcome-left">
               <div class="trade-outcome-label">${outcome}</div>
               <div class="trade-outcome-percent">${percent}%</div>
@@ -3391,10 +3636,16 @@
       // Add click handlers for outcomes
       outcomesContainer.querySelectorAll('.trade-outcome').forEach(outcomeEl => {
         outcomeEl.addEventListener('click', () => {
-          // Remove active from all
-          outcomesContainer.querySelectorAll('.trade-outcome').forEach(o => o.classList.remove('active'));
-          // Add active to clicked
+          // Remove active from all and restore team colors
+          outcomesContainer.querySelectorAll('.trade-outcome').forEach(o => {
+            o.classList.remove('active');
+            // Restore team-specific color from data attribute
+            const outcomeColor = o.dataset.outcomeColor || 'var(--market-color, #003366)';
+            o.style.background = outcomeColor;
+          });
+          // Add active to clicked (black background)
           outcomeEl.classList.add('active');
+          outcomeEl.style.background = '#000000';
           
           state.selectedOutcomeIndex = parseInt(outcomeEl.dataset.outcomeIndex);
           state.tradeSide = outcomeEl.dataset.outcome;

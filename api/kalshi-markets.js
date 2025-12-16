@@ -1,7 +1,28 @@
 // api/kalshi-markets.js
 // Fetches markets from Kalshi API and normalizes to match Polymarket format
+// NOTE: Kalshi API requires authentication for all endpoints
+// API credentials must be configured via environment variables:
+// KALSHI_ACCESS_KEY and KALSHI_PRIVATE_KEY
 
 const KALSHI_API_BASE = "https://trading-api.kalshi.com/trade-api/v2";
+const crypto = require("crypto");
+
+/**
+ * Generates Kalshi API authentication signature
+ */
+function generateKalshiSignature(timestamp, method, path, privateKey) {
+  const message = `${timestamp}${method}${path}`;
+  const key = crypto.createPrivateKey({
+    key: privateKey,
+    format: "pem",
+  });
+  const signature = crypto.sign("RSA-SHA256", Buffer.from(message), {
+    key,
+    padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+    saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+  });
+  return signature.toString("base64");
+}
 
 /**
  * Fetches markets from Kalshi API
@@ -10,9 +31,18 @@ const KALSHI_API_BASE = "https://trading-api.kalshi.com/trade-api/v2";
 async function fetchKalshiMarkets(options = {}) {
   const { kind = "trending", limit = 1000, sportType = null } = options;
   
+  // Check if API credentials are configured
+  const accessKey = process.env.KALSHI_ACCESS_KEY;
+  const privateKey = process.env.KALSHI_PRIVATE_KEY;
+  
+  if (!accessKey || !privateKey) {
+    throw new Error("Kalshi API credentials not configured. Please set KALSHI_ACCESS_KEY and KALSHI_PRIVATE_KEY environment variables.");
+  }
+  
   try {
     // Kalshi API endpoint - adjust based on actual API structure
     // Common endpoints: /markets, /events/{event_id}/markets, /series/{series_id}/markets
+    const path = "/trade-api/v2/markets"; // Path for signature (without query params)
     let apiUrl = `${KALSHI_API_BASE}/markets`;
     
     // Build query parameters based on options
@@ -29,6 +59,11 @@ async function fetchKalshiMarkets(options = {}) {
     
     apiUrl += `?${params.toString()}`;
     
+    // Generate authentication headers
+    const timestamp = Date.now().toString();
+    const method = "GET";
+    const signature = generateKalshiSignature(timestamp, method, path, privateKey);
+    
     console.log("[kalshi-markets] Fetching from:", apiUrl);
     
     const response = await fetch(apiUrl, {
@@ -36,13 +71,21 @@ async function fetchKalshiMarkets(options = {}) {
       headers: {
         "Accept": "application/json",
         "Content-Type": "application/json",
+        "KALSHI-ACCESS-KEY": accessKey,
+        "KALSHI-ACCESS-TIMESTAMP": timestamp,
+        "KALSHI-ACCESS-SIGNATURE": signature,
       },
     });
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[kalshi-markets] API error:", response.status, errorText);
-      throw new Error(`Kalshi API error: ${response.status}`);
+      
+      if (response.status === 401) {
+        throw new Error("Kalshi API authentication failed. Please check your API credentials.");
+      }
+      
+      throw new Error(`Kalshi API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();

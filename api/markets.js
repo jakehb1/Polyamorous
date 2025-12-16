@@ -2,9 +2,9 @@
 // Fetches markets from Supabase database (mimics Polymarket architecture)
 // Falls back to Polymarket Gamma API if database is not configured or empty
 
-// Simple in-memory cache with TTL (5 seconds for fast updates)
+// Simple in-memory cache with TTL (2 seconds for near real-time updates)
 const cache = new Map();
-const CACHE_TTL = 5000; // 5 seconds
+const CACHE_TTL = 2000; // 2 seconds - reduced for more accurate/real-time data
 
 // Category tag IDs (verified from Polymarket events)
 const CATEGORY_TAG_IDS = {
@@ -71,10 +71,17 @@ module.exports = async (req, res) => {
       });
     } catch (error) {
       console.error("[markets] Kalshi error:", error.message);
-      return res.status(500).json({
+      
+      // Return 503 (Service Unavailable) for configuration errors, 500 for API errors
+      const statusCode = error.message.includes("not configured") || error.message.includes("authentication failed") 
+        ? 503 
+        : 500;
+      
+      return res.status(statusCode).json({
         error: "kalshi_fetch_failed",
         message: error.message,
         markets: [],
+        requiresAuth: true,
       });
     }
   }
@@ -82,11 +89,11 @@ module.exports = async (req, res) => {
   // Default to Polymarket (existing logic continues below)
   // Allow much higher limits to get all markets (default 1000, max 10000)
   const limitNum = Math.min(Math.max(Number(limit) || 1000, 1), 10000);
-  // Parse minVolume - default to $0.01 to filter out zero-volume markets but allow very low volume
-  // This ensures we get live markets even if they have minimal volume
+  // Parse minVolume - default to 0 (no filter) to match Polymarket's behavior
+  // Only filter if explicitly requested - Polymarket shows all active markets regardless of volume
   const minVolumeProvided = req.query.minVolume !== undefined && req.query.minVolume !== null;
-  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0.01;
-  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0.01 : minVolumeParsed, 0);
+  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0;
+  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0 : minVolumeParsed, 0);
   // sportType: "games" or "props" - used to filter sports markets
 
   // Check cache first (only for reasonable limits to avoid caching huge responses)
@@ -1628,21 +1635,25 @@ module.exports = async (req, res) => {
 
     console.log("[markets] After price filter:", markets.length);
 
-    // Filter: must meet minimum volume threshold - always filter out zero-volume markets
-    const beforeVolumeFilter = markets.length;
-    markets = markets.filter(m => {
-      const volume24hr = parseFloat(m.volume24hr) || 0;
-      const volume = parseFloat(m.volume) || 0;
-      const totalVolume = Math.max(volume24hr, volume);
-      // Always exclude zero-volume markets, and apply minVolume threshold if set
-      const passes = totalVolume > 0 && totalVolume >= minVolumeNum;
-      if (!passes && beforeVolumeFilter < 100) {
-        // Log sample of filtered markets for debugging when we have few markets
-        console.log("[markets] Filtered market:", m.question?.substring(0, 50), "volume:", totalVolume);
-      }
-      return passes;
-    });
-    console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "zero/low-volume markets)");
+    // Filter: must meet minimum volume threshold (only if minVolumeNum > 0)
+    // Don't filter by volume by default - match Polymarket's behavior of showing all active markets
+    if (minVolumeNum > 0) {
+      const beforeVolumeFilter = markets.length;
+      markets = markets.filter(m => {
+        const volume24hr = parseFloat(m.volume24hr) || 0;
+        const volume = parseFloat(m.volume) || 0;
+        const totalVolume = Math.max(volume24hr, volume);
+        const passes = totalVolume >= minVolumeNum;
+        if (!passes && beforeVolumeFilter < 100) {
+          // Log sample of filtered markets for debugging when we have few markets
+          console.log("[markets] Filtered market:", m.question?.substring(0, 50), "volume:", totalVolume);
+        }
+        return passes;
+      });
+      console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "low-volume markets)");
+    } else {
+      console.log("[markets] No volume filter applied - showing all active markets (matching Polymarket behavior)");
+    }
     
     // If we have very few markets after filtering, log details for debugging
     if (markets.length === 0 && beforeVolumeFilter > 0) {
@@ -1656,19 +1667,31 @@ module.exports = async (req, res) => {
       );
     }
 
-    // Sort by volume (highest first)
-    markets.sort((a, b) => {
-      const volA = parseFloat(a.volume24hr) || parseFloat(a.volume) || 0;
-      const volB = parseFloat(b.volume24hr) || parseFloat(b.volume) || 0;
-      return volB - volA;
-    });
-    
-    // For "new", re-sort by date
-    if (kind === "new") {
+    // Sort markets to match Polymarket's behavior
+    // For "trending": Sort by volume24hr (24-hour volume indicates trending activity)
+    // For "volume": Sort by total volume (all-time volume)
+    // For "new": Sort by creation date (newest first)
+    // For categories: Sort by volume24hr (most active first)
+    if (kind === "volume") {
+      // Sort by total volume (all-time)
+      markets.sort((a, b) => {
+        const volA = parseFloat(a.volume) || parseFloat(a.volume24hr) || 0;
+        const volB = parseFloat(b.volume) || parseFloat(b.volume24hr) || 0;
+        return volB - volA;
+      });
+    } else if (kind === "new") {
+      // Sort by creation date (newest first)
       markets.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.startDate || 0);
         const dateB = new Date(b.createdAt || b.startDate || 0);
         return dateB - dateA;
+      });
+    } else {
+      // Default: Sort by volume24hr (trending/category views use 24hr volume)
+      markets.sort((a, b) => {
+        const volA = parseFloat(a.volume24hr) || parseFloat(a.volume) || 0;
+        const volB = parseFloat(b.volume24hr) || parseFloat(b.volume) || 0;
+        return volB - volA;
       });
     }
     
