@@ -1091,8 +1091,45 @@ module.exports = async (req, res) => {
                 
                 // Extract and filter by week
                 const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug);
-                if (targetWeek !== null && eventWeek !== null && eventWeek !== targetWeek) {
-                  continue; // Skip events from other weeks
+                
+                // Filter by week: if we can extract week number, it must match target week
+                // But if we can't extract week, check if event date is within current week range
+                if (targetWeek !== null) {
+                  if (eventWeek !== null && eventWeek !== targetWeek) {
+                    continue; // Skip events from other weeks if we can confirm the week
+                  }
+                  
+                  // If no week info, check event date to determine if it's in the target week
+                  // NFL weeks typically run Thu-Sun, so calculate week date range
+                  if (eventWeek === null && event.startDate) {
+                    const eventDate = new Date(event.startDate);
+                    const now = new Date();
+                    const currentYear = now.getFullYear();
+                    
+                    // Calculate season start (first Thursday in September, around Sept 5-10)
+                    let seasonStart = new Date(currentYear, 8, 1);
+                    while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
+                    if (seasonStart.getDate() < 5) seasonStart.setDate(5);
+                    else if (seasonStart.getDate() > 10) seasonStart.setDate(5);
+                    
+                    if (now < seasonStart) {
+                      seasonStart = new Date(currentYear - 1, 8, 1);
+                      while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
+                      if (seasonStart.getDate() < 5) seasonStart.setDate(5);
+                      else if (seasonStart.getDate() > 10) seasonStart.setDate(5);
+                    }
+                    
+                    // Calculate target week date range (each week is 7 days, Thu-Wed)
+                    const weekStart = new Date(seasonStart);
+                    weekStart.setDate(seasonStart.getDate() + (targetWeek - 1) * 7);
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekStart.getDate() + 7);
+                    
+                    // If event date is outside target week range, skip it
+                    if (eventDate < weekStart || eventDate >= weekEnd) {
+                      continue;
+                    }
+                  }
                 }
                 
                 // Exclude prop events (MVP, leaders, etc.)
