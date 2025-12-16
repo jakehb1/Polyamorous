@@ -1520,8 +1520,31 @@ module.exports = async (req, res) => {
 
     // Filter: If sportType is "games" and NFL, only include NFL game markets
     // Exclude props, futures, and other non-game markets
-    // Also exclude other sports (only NFL games for now)
+    // Also exclude other sports (only NFL games for now) - STRICT filtering
     if (sportType === "games" && isSportsSubcategory && kind.toLowerCase() === "nfl") {
+      // First pass: Filter out non-NFL sports before other checks
+      const beforeSportFilter = markets.length;
+      const nflTeamKeywords = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
+                               'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
+                               'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
+                               'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
+                               'giants', 'eagles', 'bears', 'vikings'];
+      const nonNflSports = ['college football', 'cfb', 'ncaa', 'dota', 'esports', 'serie a', 'premier league', 
+                           'la liga', 'bundesliga', 'nba', 'mlb', 'nhl', 'soccer', 'basketball', 'baseball', 
+                           'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket'];
+      
+      markets = markets.filter(m => {
+        const marketText = `${m.question || ''} ${m.slug || ''} ${m.eventTitle || ''}`.toLowerCase();
+        // Exclude if it mentions non-NFL sports
+        const mentionsOtherSport = nonNflSports.some(sport => marketText.includes(sport));
+        if (mentionsOtherSport && !marketText.includes('nfl')) {
+          return false;
+        }
+        // Must have NFL team or NFL keyword
+        const hasNflIndicator = nflTeamKeywords.some(team => marketText.includes(team)) || marketText.includes('nfl');
+        return hasNflIndicator;
+      });
+      console.log("[markets] After sport filter (NFL only):", markets.length, "(removed", beforeSportFilter - markets.length, "non-NFL markets)");
       const beforeFilter = markets.length;
       markets = markets.filter(m => {
         const question = (m.question || "").toLowerCase();
@@ -1754,13 +1777,27 @@ module.exports = async (req, res) => {
         });
         
         // Check for other sports - exclude if it's clearly not NFL
-        const otherSports = ['nba', 'mlb', 'nhl', 'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket', 'premier league', 'la liga', 'serie a', 'bundesliga'];
+        // Include college football, esports, soccer leagues, and other non-NFL sports
+        const otherSports = [
+          'nba', 'mlb', 'nhl', 'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket',
+          'premier league', 'la liga', 'serie a', 'bundesliga', 'college football', 'cfb', 'ncaa', 'dota', 'esports',
+          'miami', 'texas a&m', 'washington state', 'utah state', 'troy', 'jacksonville state', 'ac milan', 'hellas verona',
+          'team falcons', 'parivision', 'over', 'under'
+        ];
         const hasOtherSport = otherSports.some(sport => {
           const marketText = `${question} ${slug} ${eventTitle}`.toLowerCase();
-          return marketText.includes(sport) && !marketText.includes('nfl');
+          // Exclude if it contains other sport terms (unless it also has strong NFL indicators)
+          if (marketText.includes(sport)) {
+            // If it has NFL tag or strong NFL indicators, keep it; otherwise exclude
+            return !marketText.includes('nfl') && !hasNflTeam;
+          }
+          return false;
         });
         
-        if (!hasNflTeam || hasOtherSport) return false; // Must mention NFL teams and not be other sports
+        // STRICT: Must have NFL teams AND not be other sports
+        if (!hasNflTeam || hasOtherSport) {
+          return false; // Exclude if no NFL teams or if it's another sport
+        }
         
         // Exclude props
         const isProp = 
