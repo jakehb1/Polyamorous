@@ -2875,6 +2875,99 @@
     // =====================
     // MARKETS
     // =====================
+    
+    // NFL Team Colors
+    const NFL_TEAM_COLORS = {
+      // NFC
+      'rams': '#003594', 'los angeles rams': '#003594', 'lar': '#003594', 'la': '#003594',
+      '49ers': '#AA0000', 'san francisco 49ers': '#AA0000', 'sf': '#AA0000',
+      'cowboys': '#003594', 'dallas cowboys': '#003594', 'dal': '#003594',
+      'packers': '#203731', 'green bay packers': '#203731', 'gb': '#203731',
+      'bears': '#0B162A', 'chicago bears': '#0B162A', 'chi': '#0B162A',
+      'vikings': '#4F2683', 'minnesota vikings': '#4F2683', 'min': '#4F2683',
+      'lions': '#0076B6', 'detroit lions': '#0076B6', 'det': '#0076B6',
+      'saints': '#D3BC8D', 'new orleans saints': '#D3BC8D', 'no': '#D3BC8D',
+      'falcons': '#A71930', 'atlanta falcons': '#A71930', 'atl': '#A71930',
+      'panthers': '#0085CA', 'carolina panthers': '#0085CA', 'car': '#0085CA',
+      'buccaneers': '#D50A0A', 'tampa bay buccaneers': '#D50A0A', 'tb': '#D50A0A',
+      'cardinals': '#97233F', 'arizona cardinals': '#97233F', 'ari': '#97233F',
+      'seahawks': '#002244', 'seattle seahawks': '#002244', 'sea': '#002244',
+      'commanders': '#5A1414', 'washington commanders': '#5A1414', 'was': '#5A1414', 'wsh': '#5A1414',
+      'giants': '#0B2265', 'new york giants': '#0B2265', 'nyg': '#0B2265',
+      'eagles': '#004C54', 'philadelphia eagles': '#004C54', 'phi': '#004C54',
+      // AFC
+      'broncos': '#FB4F14', 'denver broncos': '#FB4F14', 'den': '#FB4F14',
+      'chiefs': '#E31837', 'kansas city chiefs': '#E31837', 'kc': '#E31837',
+      'raiders': '#000000', 'las vegas raiders': '#000000', 'lv': '#000000',
+      'chargers': '#0080C6', 'los angeles chargers': '#0080C6', 'lac': '#0080C6',
+      'patriots': '#002244', 'new england patriots': '#002244', 'ne': '#002244',
+      'jets': '#125740', 'new york jets': '#125740', 'nyj': '#125740',
+      'bills': '#00338D', 'buffalo bills': '#00338D', 'buf': '#00338D',
+      'ravens': '#241773', 'baltimore ravens': '#241773', 'bal': '#241773',
+      'bengals': '#FB4F14', 'cincinnati bengals': '#FB4F14', 'cin': '#FB4F14',
+      'browns': '#FF3C00', 'cleveland browns': '#FF3C00', 'cle': '#FF3C00',
+      'steelers': '#FFB612', 'pittsburgh steelers': '#FFB612', 'pit': '#FFB612',
+      'texans': '#03202F', 'houston texans': '#03202F', 'hou': '#03202F',
+      'colts': '#002C5F', 'indianapolis colts': '#002C5F', 'ind': '#002C5F',
+      'jaguars': '#006778', 'jacksonville jaguars': '#006778', 'jax': '#006778',
+      'titans': '#0C2340', 'tennessee titans': '#0C2340', 'ten': '#0C2340',
+    };
+    
+    // Extract team name from text
+    function extractTeamName(text) {
+      if (!text) return null;
+      const textLower = text.toLowerCase();
+      for (const [team, color] of Object.entries(NFL_TEAM_COLORS)) {
+        if (textLower.includes(team)) {
+          return team;
+        }
+      }
+      return null;
+    }
+    
+    // Get color for a specific outcome (Yes/No or team name)
+    function getOutcomeColor(market, outcome, index) {
+      const outcomeLower = outcome.toLowerCase();
+      const question = (market.question || '').toLowerCase();
+      const eventTitle = (market.eventTitle || '').toLowerCase();
+      const allText = `${question} ${eventTitle}`.toLowerCase();
+      
+      // For team matchups (NFL games), use team colors
+      const teamName = extractTeamName(outcome);
+      if (teamName && NFL_TEAM_COLORS[teamName]) {
+        return NFL_TEAM_COLORS[teamName];
+      }
+      
+      // For non-team outcomes (Yes/No), use green for Yes and red for No
+      if (outcomeLower === 'yes' || (index === 0 && !teamName)) {
+        return '#10b981'; // Green for Yes
+      } else if (outcomeLower === 'no' || (index === 1 && !teamName)) {
+        return '#ef4444'; // Red for No
+      }
+      
+      // Fallback: try to find team in all text
+      const teamInText = extractTeamName(allText);
+      if (teamInText && NFL_TEAM_COLORS[teamInText]) {
+        return NFL_TEAM_COLORS[teamInText];
+      }
+      
+      // Default fallback
+      return '#003366';
+    }
+    
+    // Get market color (for backward compatibility, returns a default color)
+    function getMarketColor(market) {
+      // For NFL games with teams, return first team color as default
+      const question = (market.question || '').toLowerCase();
+      const eventTitle = (market.eventTitle || '').toLowerCase();
+      const allText = `${question} ${eventTitle}`.toLowerCase();
+      const teamName = extractTeamName(allText);
+      if (teamName && NFL_TEAM_COLORS[teamName]) {
+        return NFL_TEAM_COLORS[teamName];
+      }
+      return '#003366'; // Default blue
+    }
+    
     // Get current NFL week (NFL season typically starts in early September)
     function getCurrentNFLWeek() {
       const now = new Date();
@@ -3232,13 +3325,14 @@
               <div class="market-outcomes">
                 ${outcomes.map((outcome, idx) => {
                   const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
-                  const isYes = outcome.toLowerCase() === 'yes' || idx === 0;
+                  const outcomeColor = getOutcomeColor(m, outcome, idx);
                   return `
                     <div class="outcome-button-group">
                       <span class="outcome-price">${price}</span>
-                      <button class="outcome-btn ${isYes ? 'outcome-yes' : 'outcome-no'}" 
+                      <button class="outcome-btn" 
                               data-market-id="${m.id}" 
-                              data-outcome-index="${idx}">
+                              data-outcome-index="${idx}"
+                              style="background: ${outcomeColor}; color: white; border-color: ${outcomeColor};">
                         ${outcome}
                       </button>
             </div>
