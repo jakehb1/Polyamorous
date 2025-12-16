@@ -1028,8 +1028,11 @@ module.exports = async (req, res) => {
                 const eventSlug = (event.slug || "").toLowerCase();
                 const eventTags = (event.tags || []).map(t => typeof t === 'string' ? t.toLowerCase() : (t.slug || t.label || "").toLowerCase());
                 
-                // Check if event is NFL-related
-                const hasNflTag = eventTags.some(t => t.includes('nfl'));
+                // Check if event is NFL-related - MUST have NFL tag or NFL teams
+                const hasNflTag = eventTags.some(t => {
+                  const tagText = typeof t === 'string' ? t.toLowerCase() : (t.slug || t.label || '').toLowerCase();
+                  return tagText.includes('nfl');
+                });
                 // Check if event title/slug contains NFL teams (use word boundaries to avoid false positives)
                 const hasNflTeam = nflTeams.some(team => {
                   // For abbreviations, check for exact match or with word boundaries
@@ -1084,8 +1087,17 @@ module.exports = async (req, res) => {
                 });
                 
                 // Include if it looks like an NFL game event
-                // Be more permissive - include if markets have teams OR event has teams/tags
+                // Must have NFL tag OR NFL teams (be strict - only NFL games)
                 if ((hasNflTag || hasNflTeam || marketsHaveTeams) && (hasWeek || hasVs || hasGameMarkets || event.markets.length >= 2)) {
+                  // Double-check: reject if it's clearly not NFL (has other sport indicators)
+                  const otherSports = ['nba', 'mlb', 'nhl', 'soccer', 'football', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket'];
+                  const hasOtherSport = otherSports.some(sport => {
+                    const eventText = `${eventTitle} ${eventSlug}`.toLowerCase();
+                    return eventText.includes(sport) && !eventText.includes('nfl');
+                  });
+                  if (hasOtherSport && !hasNflTag && !hasNflTeam) {
+                    continue; // Skip if it's another sport and doesn't have NFL indicators
+                  }
                   checkedCount++;
                   // Exclude if it's clearly a prop event
                   const isPropEvent = eventTitle.includes("mvp") || eventTitle.includes("leader") || 
@@ -1506,9 +1518,10 @@ module.exports = async (req, res) => {
     
     console.log("[markets] Total unique markets found:", markets.length);
 
-    // Filter: If sportType is "games", only include markets that are part of events (actual games)
+    // Filter: If sportType is "games" and NFL, only include NFL game markets
     // Exclude props, futures, and other non-game markets
-    if (sportType === "games" && isSportsSubcategory) {
+    // Also exclude other sports (only NFL games for now)
+    if (sportType === "games" && isSportsSubcategory && kind.toLowerCase() === "nfl") {
       const beforeFilter = markets.length;
       markets = markets.filter(m => {
         const question = (m.question || "").toLowerCase();
@@ -1740,7 +1753,14 @@ module.exports = async (req, res) => {
           return question.includes(team) || slug.includes(team) || eventTitle.includes(team);
         });
         
-        if (!hasNflTeam) return false; // Must mention NFL teams
+        // Check for other sports - exclude if it's clearly not NFL
+        const otherSports = ['nba', 'mlb', 'nhl', 'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket', 'premier league', 'la liga', 'serie a', 'bundesliga'];
+        const hasOtherSport = otherSports.some(sport => {
+          const marketText = `${question} ${slug} ${eventTitle}`.toLowerCase();
+          return marketText.includes(sport) && !marketText.includes('nfl');
+        });
+        
+        if (!hasNflTeam || hasOtherSport) return false; // Must mention NFL teams and not be other sports
         
         // Exclude props
         const isProp = 

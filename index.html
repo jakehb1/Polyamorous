@@ -2766,9 +2766,16 @@
               // Scroll to active chip (center it if possible)
               chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
               
-              // If sports is clicked, show subcategories instead of markets
+              // If sports is clicked, go directly to NFL games
               if (kind === 'sports') {
-                showSportsSubcategories();
+                state.selectedCategory = 'nfl';
+                state.selectedSportType = 'games';
+                // Hide sub-filters since we're going directly to NFL games
+                const subFiltersContainer = document.getElementById('subFiltersContainer');
+                if (subFiltersContainer) {
+                  subFiltersContainer.style.display = 'none';
+                }
+                fetchMarkets('nfl', 'games');
               } else {
                 // Fetch markets for this category
                 fetchMarkets(kind);
