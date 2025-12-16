@@ -2916,18 +2916,23 @@
     // Extract team name from text
     function extractTeamName(text) {
       if (!text) return null;
-      const textLower = text.toLowerCase();
-      for (const [team, color] of Object.entries(NFL_TEAM_COLORS)) {
-        if (textLower.includes(team)) {
-          return team;
+      try {
+        const textLower = String(text).toLowerCase();
+        for (const [team, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (textLower.includes(team)) {
+            return team;
+          }
         }
+      } catch (e) {
+        console.error('[extractTeamName] Error:', e);
       }
       return null;
     }
     
     // Get color for a specific outcome (Yes/No or team name)
     function getOutcomeColor(market, outcome, index) {
-      const outcomeLower = outcome.toLowerCase();
+      if (!market || !outcome) return '#003366'; // Default fallback
+      const outcomeLower = String(outcome).toLowerCase();
       const question = (market.question || '').toLowerCase();
       const eventTitle = (market.eventTitle || '').toLowerCase();
       const allText = `${question} ${eventTitle}`.toLowerCase();
