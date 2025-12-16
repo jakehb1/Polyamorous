@@ -1237,35 +1237,9 @@ module.exports = async (req, res) => {
           console.log("[markets] Error searching events for NFL games:", e.message);
         }
         
-        // Approach 2: Query markets directly by NFL tag IDs (most direct)
-        try {
-          const nflTagIds = [1, 450, 100639];
-          console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
-          for (const tagId of nflTagIds) {
-            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000`;
-            const tagMarketsResp = await fetch(tagMarketsUrl);
-            if (tagMarketsResp.ok) {
-              const tagMarkets = await tagMarketsResp.json();
-              if (Array.isArray(tagMarkets)) {
-                console.log("[markets] Found", tagMarkets.length, "markets with tag_id", tagId);
-                // Add all active markets - we'll filter props in the filtering step below
-                for (const market of tagMarkets) {
-                  if (!market.closed && market.active !== false) {
-                    const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
-                    if (!existing) {
-                      markets.push(market);
-                    }
-                  }
-                }
-              }
-            }
-          }
-          console.log("[markets] Total markets from tag IDs:", markets.length);
-        } catch (e) {
-          console.log("[markets] Error fetching markets by tag IDs:", e.message);
-        }
-        
-        // Approach 3: Search all markets for game structure
+        // NOTE: We ONLY use the /events endpoint for NFL games to ensure we get the correct data
+        // Do NOT query /markets directly as it pulls in non-NFL games (college football, etc.)
+        // The /events endpoint with NFL tag_id gives us the correct NFL games organized by week
         try {
           const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
           const resp = await fetch(url);
