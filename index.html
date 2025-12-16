@@ -3106,27 +3106,22 @@
                 ${event.markets.map(m => {
                   const prices = m.outcomePrices || [];
                   const outcomes = m.outcomes || ["Yes", "No"];
-                  const vol = m.volume24hr || m.volume || 0;
-                  
-                  // Get market color for this market
-                  const marketColor = getMarketColor(m);
                   
                   return `
-                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="cursor: pointer; --market-color: ${marketColor};">
-                      <div class="outcome-label">${m.question}</div>
-                      <div class="outcome-buttons">
+                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                      <div class="outcome-label" style="font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text);">${m.question}</div>
+                      <div class="outcome-buttons" style="display: flex; gap: 8px;">
                         ${outcomes.map((outcome, idx) => {
                           const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
-                          const isYes = outcome.toLowerCase() === 'yes' || idx === 0;
                           // Get team-specific color for this outcome
                           const outcomeColor = getOutcomeColor(m, outcome, idx);
                           return `
-                            <div class="outcome-button-group">
-                              <span class="outcome-price">${price}</span>
-                              <button class="outcome-btn ${isYes ? 'outcome-yes' : 'outcome-no'}" 
+                            <div class="outcome-button-group" style="display: flex; align-items: center; gap: 6px;">
+                              <span class="outcome-price" style="font-size: 14px; font-weight: 600; color: var(--text);">${price}</span>
+                              <button class="outcome-btn" 
                                       data-market-id="${m.id}" 
                                       data-outcome-index="${idx}"
-                                      style="background: ${outcomeColor}; color: white; border-color: ${outcomeColor};">
+                                      style="padding: 6px 12px; border-radius: 6px; border: none; background: ${outcomeColor}; color: white; font-size: 14px; font-weight: 500; cursor: pointer;">
                                 ${outcome}
                               </button>
                             </div>
