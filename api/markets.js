@@ -1139,7 +1139,9 @@ module.exports = async (req, res) => {
                 }
                 
                 matchedEvents++;
-                console.log("[markets] Including NFL event:", event.title, "Week:", eventWeek || "unknown");
+                // Log event details including date for debugging
+                const eventDateStr = event.startDate ? new Date(event.startDate).toISOString() : 'no date';
+                console.log("[markets] Including NFL event:", event.title, "Week:", eventWeek || "unknown", "Date:", eventDateStr, "startDate:", event.startDate);
                 
                 // Include all markets from this event (they're already NFL games from NFL-tagged events)
                 for (const market of event.markets) {
@@ -1156,6 +1158,7 @@ module.exports = async (req, res) => {
                   if (!existing) {
                     // CRITICAL: Preserve ALL market volume fields - these must come from market, not event
                     // Market volumes are individual per market, event volumes are aggregate
+                    // Also ensure event.startDate is properly passed through
                     markets.push({
                       ...market, // Spread all market fields first
                       // Explicitly preserve volume fields from market (handle different API field name variations)
@@ -1168,8 +1171,8 @@ module.exports = async (req, res) => {
                       eventTitle: event.title,
                       eventSlug: event.slug,
                       eventTicker: event.ticker,
-                      eventStartDate: event.startDate,
-                      eventEndDate: event.endDate,
+                      eventStartDate: event.startDate || event.start_date || null, // Try both field names
+                      eventEndDate: event.endDate || event.end_date || null,
                       eventImage: event.image || event.icon,
                       eventVolume: event.volume, // Event volume is aggregate - separate from market volume
                       eventLiquidity: event.liquidity, // Event liquidity is aggregate - separate from market liquidity
