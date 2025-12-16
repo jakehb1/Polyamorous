@@ -1138,14 +1138,12 @@ module.exports = async (req, res) => {
                                  (eventTags.find(t => String(t).includes('week')) ? extractWeekNumber(String(eventTags.find(t => String(t).includes('week')))) : null);
                 
                 // Filter by target week if specified (only include events from that week)
+                // But be more permissive - if we can't extract week info, still include the event
+                // (it might be from the target week, we just can't confirm it)
                 if (targetWeek !== null && eventWeek !== null && eventWeek !== targetWeek) {
-                  continue; // Skip events from other weeks
+                  continue; // Skip events from other weeks (only if we can confirm the week)
                 }
-                
-                // If we have a week filter but event has no week info, skip it (strict filtering)
-                if (targetWeek !== null && eventWeek === null) {
-                  continue; // Skip events without week information when filtering by week
-                }
+                // Note: We don't skip events without week info - we include them in case they're from the target week
                 
                 // Filter by event start date - only exclude games that are clearly in the past
                 if (event.startDate) {
@@ -1168,14 +1166,36 @@ module.exports = async (req, res) => {
                 // Must have NFL tag OR NFL teams (be strict - only NFL games)
                 if ((hasNflTag || hasNflTeam || marketsHaveTeams) && (hasWeek || hasVs || hasGameMarkets || event.markets.length >= 2)) {
                   // Double-check: reject if it's clearly not NFL (has other sport indicators)
-                  const otherSports = ['college football', 'cfb', 'ncaa', 'dota', 'esports', 'serie a', 'ac milan', 
-                                      'hellas verona', 'premier league', 'la liga', 'bundesliga', 'nba', 'mlb', 'nhl', 
-                                      'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 
-                                      'cricket', 'troy', 'jacksonville state', 'texas a&m', 'texas a and m', 
-                                      'washington state', 'utah state', 'team falcons', 'parivision', 'espn college'];
-                  const eventText = `${eventTitle} ${eventSlug}`.toLowerCase();
+                  // Be more aggressive with college/NCAA detection
+                  const otherSports = [
+                    // College Football - be very specific
+                    'college football', 'cfb', 'ncaa', 'ncaaf', 'espn college', 'college', 
+                    'miami hurricanes', 'texas a&m', 'texas a and m', 'texas a&m aggies',
+                    'troy', 'jacksonville state', 'washington state', 'utah state',
+                    // Only exclude "hurricanes" if it's clearly college (miami hurricanes)
+                    // But we need to check context - "falcons" alone is NFL, not college
+                    // Esports
+                    'dota', 'dota 2', 'esports', 'team falcons', 'parivision',
+                    // Soccer/Football leagues
+                    'serie a', 'ac milan', 'hellas verona', 'premier league', 'la liga', 'bundesliga', 'soccer',
+                    // Other sports
+                    'nba', 'mlb', 'nhl', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket'
+                  ];
+                  const eventText = `${eventTitle} ${eventSlug} ${eventTags.join(' ')}`.toLowerCase();
+                  
+                  // Check for NCAA/college football specifically - must exclude if found
+                  const hasCollegeFootball = /ncaa|cfb|college\s+football|espn\s+college/.test(eventText);
+                  if (hasCollegeFootball && !eventText.includes('nfl')) {
+                    continue; // Skip college football markets
+                  }
+                  
                   const hasOtherSport = otherSports.some(sport => {
-                    return eventText.includes(sport.toLowerCase());
+                    const sportLower = sport.toLowerCase();
+                    // For short terms, use word boundaries
+                    if (sportLower.length <= 4) {
+                      return new RegExp(`\\b${sportLower}\\b`, 'i').test(eventText);
+                    }
+                    return eventText.includes(sportLower);
                   });
                   // Skip if it mentions other sports (unless it has strong NFL indicators)
                   if (hasOtherSport && !hasNflTag && !hasNflTeam) {
@@ -1645,9 +1665,10 @@ module.exports = async (req, res) => {
       // Non-NFL sports and teams to exclude
       // Include college teams, esports, soccer leagues, and other sports
       const nonNflSports = [
-        // College Football
-        'college football', 'cfb', 'ncaa', 'espn college', 'college', 'hurricanes', 'troy', 'jacksonville state', 
-        'texas a&m', 'texas a and m', 'washington state', 'utah state', 'miami hurricanes', 'texas a&m aggies',
+        // College Football - be very aggressive with detection
+        'college football', 'cfb', 'ncaa', 'ncaaf', 'espn college', 'college', 
+        'miami hurricanes', 'texas a&m', 'texas a and m', 'texas a&m aggies',
+        'troy', 'jacksonville state', 'washington state', 'utah state',
         // Esports
         'dota', 'dota 2', 'esports', 'team falcons', 'parivision',
         // Soccer/Football leagues
@@ -1658,8 +1679,22 @@ module.exports = async (req, res) => {
       
       markets = markets.filter(m => {
         const marketText = `${m.question || ''} ${m.slug || ''} ${m.eventTitle || ''}`.toLowerCase();
-        // STRICT: Exclude if it mentions any non-NFL sports (no exceptions)
-        const mentionsOtherSport = nonNflSports.some(sport => marketText.includes(sport.toLowerCase()));
+        
+        // First, check for NCAA/college football explicitly - must exclude
+        const hasCollegeFootball = /ncaa|cfb|college\s+football|espn\s+college/.test(marketText);
+        if (hasCollegeFootball && !marketText.includes('nfl')) {
+          return false; // Strictly exclude college/NCAA markets
+        }
+        
+        // Then check for other non-NFL sports
+        const mentionsOtherSport = nonNflSports.some(sport => {
+          const sportLower = sport.toLowerCase();
+          // For short terms, use word boundaries to avoid false positives
+          if (sportLower.length <= 4) {
+            return new RegExp(`\\b${sportLower}\\b`, 'i').test(marketText);
+          }
+          return marketText.includes(sportLower);
+        });
         if (mentionsOtherSport) {
           return false; // Strictly exclude - don't allow any non-NFL sports
         }
