@@ -1753,14 +1753,19 @@ module.exports = async (req, res) => {
         if (m.eventStartDate) {
           const eventStart = new Date(m.eventStartDate);
           const now = new Date();
-          // Exclude games that started more than 3 hours ago (games typically last ~3 hours)
-          // This ensures we only show active/upcoming games, not past games
-          const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-          if (eventStart < threeHoursAgo) {
-            return false; // Skip games that already happened
+          // Only filter if date is valid
+          if (!isNaN(eventStart.getTime())) {
+            // Exclude games that started more than 3 hours ago (games typically last ~3 hours)
+            // This ensures we only show active/upcoming games, not past games
+            const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+            if (eventStart < threeHoursAgo) {
+              return false; // Skip games that already happened
+            }
           }
+          // If date is invalid or in the future, include the market
           // Don't filter future games - show all upcoming games
         }
+        // If no date, include the market (might be upcoming)
         
         // Check week number from event tags or title
         const eventTitle = (m.eventTitle || "").toLowerCase();
