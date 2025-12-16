@@ -1028,13 +1028,14 @@ module.exports = async (req, res) => {
             console.log("[markets] Using fallback NFL tag IDs:", nflTagIds);
           }
           
-          // Query events with NFL tag IDs
-          const eventQueries = nflTagIds.map(tagId => 
-            `${GAMMA_API}/events?tag_id=${tagId}&closed=false&limit=500`
-          );
-          
-          // Also try the series endpoint if available
-          eventQueries.push(`${GAMMA_API}/events?series=10187&closed=false&limit=500`);
+          // Query events - the API may not support tag_id as query param, so fetch all and filter
+          // Try multiple approaches to get NFL events
+          const eventQueries = [
+            // Try fetching all events and filter by tags (most reliable)
+            `${GAMMA_API}/events?closed=false&limit=1000`,
+            // Try with series parameter
+            `${GAMMA_API}/events?series=10187&closed=false&limit=500`,
+          ];
           
           // Fetch all queries in parallel
           const eventPromises = eventQueries.map(async (eventUrl) => {
@@ -1042,7 +1043,22 @@ module.exports = async (req, res) => {
               const eventResp = await fetch(eventUrl);
               if (eventResp.ok) {
                 const events = await eventResp.json();
-                return Array.isArray(events) ? events : [];
+                const eventsArray = Array.isArray(events) ? events : [];
+                
+                // Filter events that have NFL tags
+                if (nflTagIds.length > 0) {
+                  return eventsArray.filter(event => {
+                    const eventTags = event.tags || [];
+                    return eventTags.some(tag => {
+                      const tagId = typeof tag === 'object' ? tag.id : tag;
+                      return nflTagIds.includes(Number(tagId));
+                    });
+                  });
+                }
+                
+                return eventsArray;
+              } else {
+                console.log("[markets] Events API returned status:", eventResp.status);
               }
               return [];
             } catch (e) {
