@@ -1578,11 +1578,19 @@ module.exports = async (req, res) => {
         'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
         'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
       ];
-      const nonNflSports = ['college football', 'cfb', 'ncaa', 'dota', 'esports', 'serie a', 'ac milan', 
-                           'hellas verona', 'premier league', 'la liga', 'bundesliga', 'nba', 'mlb', 'nhl', 
-                           'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 
-                           'cricket', 'troy', 'jacksonville state', 'texas a&m', 'texas a and m', 'washington state', 
-                           'utah state', 'team falcons', 'parivision', 'miami hurricanes', 'espn college'];
+      // Non-NFL sports and teams to exclude
+      // Include college teams, esports, soccer leagues, and other sports
+      const nonNflSports = [
+        // College Football
+        'college football', 'cfb', 'ncaa', 'espn college', 'college', 'hurricanes', 'troy', 'jacksonville state', 
+        'texas a&m', 'texas a and m', 'washington state', 'utah state', 'miami hurricanes', 'texas a&m aggies',
+        // Esports
+        'dota', 'dota 2', 'esports', 'team falcons', 'parivision',
+        // Soccer/Football leagues
+        'serie a', 'ac milan', 'hellas verona', 'premier league', 'la liga', 'bundesliga', 'soccer',
+        // Other sports
+        'nba', 'mlb', 'nhl', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket'
+      ];
       
       markets = markets.filter(m => {
         const marketText = `${m.question || ''} ${m.slug || ''} ${m.eventTitle || ''}`.toLowerCase();
