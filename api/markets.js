@@ -1369,28 +1369,18 @@ module.exports = async (req, res) => {
                 
                 // ONLY include moneyline markets (one per team) - filter out spreads, totals, props
                 // Each game should have exactly ONE moneyline market with 2 outcomes (one per team)
+                let marketsAddedFromEvent = 0;
                 for (const market of event.markets) {
-                  if (market.closed || market.active === false) continue;
+                  if (market.closed || market.active === false) {
+                    console.log("[markets] Skipping closed/inactive market:", market.question?.substring(0, 50));
+                    continue;
+                  }
                   
                   const question = (market.question || "").toLowerCase();
                   const slug = (market.slug || "").toLowerCase();
                   const marketText = `${question} ${slug}`;
                   
-                  // ONLY include moneyline markets - exclude spreads, totals, props
-                  const isMoneyline = question.includes('moneyline') || 
-                                     question.includes(' ml ') ||
-                                     question.includes(' ml?') ||
-                                     (question.includes(' vs ') && 
-                                      !question.includes('spread') && 
-                                      !question.includes('total') && 
-                                      !question.includes('o/u') &&
-                                      !question.includes('over/under') &&
-                                      !question.includes('mvp') &&
-                                      !question.includes('leader') &&
-                                      !question.includes('winner') &&
-                                      !question.includes('champion'));
-                  
-                  // Exclude all non-moneyline markets
+                  // Exclude all non-moneyline markets first
                   const isSpread = question.includes('spread') || question.includes('point spread');
                   const isTotal = question.includes('total') || question.includes('o/u') || question.includes('over/under');
                   const isProp = question.includes('mvp') || 
@@ -1398,19 +1388,35 @@ module.exports = async (req, res) => {
                                 question.includes('rookie of the year') ||
                                 question.includes('offensive player') ||
                                 question.includes('defensive player') ||
-                                question.includes('winner') && !question.includes(' vs ') ||
-                                question.includes('champion') && !question.includes(' vs ');
+                                (question.includes('winner') && !question.includes(' vs ')) ||
+                                (question.includes('champion') && !question.includes(' vs '));
                   
-                  if (!isMoneyline || isSpread || isTotal || isProp) {
-                    continue; // Skip non-moneyline markets
+                  if (isSpread || isTotal || isProp) {
+                    console.log("[markets] Skipping non-moneyline market (spread/total/prop):", question.substring(0, 60));
+                    continue;
+                  }
+                  
+                  // Include moneyline markets - be more permissive
+                  // Polymarket moneyline markets might be: "Team A vs Team B", "Team A moneyline", etc.
+                  const hasVs = question.includes(' vs ') || question.includes(' v. ') || question.includes(' @ ');
+                  const hasMoneyline = question.includes('moneyline') || question.includes(' ml ') || question.includes(' ml?') || slug.includes('moneyline');
+                  
+                  // If it has "vs" or "moneyline" and is not a spread/total/prop, include it
+                  const isMoneyline = hasVs || hasMoneyline;
+                  
+                  if (!isMoneyline) {
+                    console.log("[markets] Skipping market (no vs/moneyline indicator):", question.substring(0, 60));
+                    continue;
                   }
                   
                   // Moneyline markets should have exactly 2 outcomes (one per team)
                   const outcomes = market.outcomes || [];
                   if (outcomes.length !== 2) {
-                    console.log("[markets] Skipping moneyline market with", outcomes.length, "outcomes (expected 2):", question);
+                    console.log("[markets] Skipping market with", outcomes.length, "outcomes (expected 2):", question.substring(0, 60), "outcomes:", outcomes);
                     continue;
                   }
+                  
+                  marketsAddedFromEvent++;
                   
                   const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
                   if (!existing) {
