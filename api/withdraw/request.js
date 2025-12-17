@@ -202,6 +202,28 @@ module.exports = async (req, res) => {
         })
         .eq("user_id", userId);
 
+      // Epic 6.2: Create ledger entry for withdrawal
+      const { createLedgerEntry } = require("../lib/ledger");
+      let ledgerEntryId;
+      try {
+        ledgerEntryId = await createLedgerEntry({
+          user_id: userId,
+          entry_type: 'withdrawal',
+          amount: amount_usdc,
+          currency: 'USDC',
+          direction: 'debit',
+          status: withdrawal.status,
+          metadata: {
+            ton_destination: ton_destination_address,
+            risk_check_passed: riskCheckPassed
+          },
+          withdrawal_id: withdrawal.id
+        });
+      } catch (ledgerError) {
+        console.error("[withdraw/request] Ledger entry creation failed:", ledgerError);
+        // Continue even if ledger fails
+      }
+
       // TODO: Process withdrawal (bridge Polygon USDC -> TON)
       // For now, we'll mark it as processing
       // In production, this would trigger the bridge service

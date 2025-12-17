@@ -180,8 +180,38 @@ module.exports = async (req, res) => {
     const mockPrice = 0.5; // Mock price - would come from market data
     const shares = tradeAmount / mockPrice;
 
-    // TODO: Update balance (lock funds for position)
-    // For now, just return success
+    // Lock funds for trade (decrease available balance)
+    await supabase
+      .from("user_balances")
+      .update({
+        usdc_available: balance.usdc_available - tradeAmount
+      })
+      .eq("user_id", userId);
+
+    // Epic 6.2: Create ledger entry for trade
+    const { createLedgerEntry } = require("./lib/ledger");
+    let ledgerEntryId;
+    try {
+      ledgerEntryId = await createLedgerEntry({
+        user_id: userId,
+        entry_type: 'trade',
+        amount: tradeAmount,
+        currency: 'USDC',
+        direction: 'debit',
+        status: 'pending',
+        metadata: {
+          market_id: marketId,
+          side: side.toLowerCase(),
+          outcome_index: outcome_index || 0,
+          shares: shares,
+          price: mockPrice
+        },
+        trade_id: tradeId
+      });
+    } catch (ledgerError) {
+      console.error("[trade] Ledger entry creation failed:", ledgerError);
+      // Continue even if ledger fails
+    }
 
     const response = {
       success: true,

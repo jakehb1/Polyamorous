@@ -131,6 +131,30 @@ module.exports = async (req, res) => {
           const conversionRate = 2.5; // TODO: Get real conversion rate
           const amountUSDC = deposit.amount_ton * conversionRate;
           
+          // Epic 6.2: Create ledger entry for deposit
+          const { createLedgerEntry, updateLedgerEntryStatus } = require("../lib/ledger");
+          let ledgerEntryId;
+          try {
+            ledgerEntryId = await createLedgerEntry({
+              user_id: wallet.user_id,
+              entry_type: 'deposit',
+              amount: amountUSDC,
+              currency: 'USDC',
+              direction: 'credit',
+              status: 'bridging',
+              metadata: {
+                ton_amount: deposit.amount_ton,
+                conversion_rate: conversionRate,
+                ton_tx_hash: deposit.ton_tx_hash
+              },
+              deposit_id: deposit.id,
+              source_tx_hash: deposit.ton_tx_hash
+            });
+          } catch (ledgerError) {
+            console.error("[deposit/detect] Ledger entry creation failed:", ledgerError);
+            // Continue even if ledger fails
+          }
+          
           // Update user balance
           const { error: balanceError } = await supabase.rpc('increment_balance', {
             p_user_id: wallet.user_id,
@@ -162,6 +186,15 @@ module.exports = async (req, res) => {
               completed_at: new Date().toISOString()
             })
             .eq("id", deposit.id);
+
+          // Epic 6.2: Update ledger entry to completed
+          if (ledgerEntryId) {
+            try {
+              await updateLedgerEntryStatus(ledgerEntryId, 'completed', null, null);
+            } catch (ledgerError) {
+              console.error("[deposit/detect] Ledger update failed:", ledgerError);
+            }
+          }
 
         } catch (bridgeError) {
           console.error("[deposit/detect] Bridge error:", bridgeError);
