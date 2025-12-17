@@ -4,6 +4,7 @@
 
 const { createClient } = require("@supabase/supabase-js");
 const { validateSession } = require("../middleware/validate-session");
+const { handleApiError, ERROR_CODES } = require("../lib/errors");
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -149,10 +150,9 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("[ledger/history] Error:", err);
-    return res.status(500).json({
-      error: "history_fetch_failed",
-      message: err.message
+    return handleApiError(err, req, res, {
+      operation: 'ledger_history',
+      endpoint: '/api/ledger/history'
     });
   }
 };
