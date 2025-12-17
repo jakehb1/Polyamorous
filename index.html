@@ -2042,7 +2042,8 @@
         
         // Get the app URL (use current origin)
         const appUrl = window.location.origin;
-        const manifestUrl = `${appUrl}/tonconnect-manifest.json`;
+        // Use API endpoint for manifest to ensure proper CORS headers
+        const manifestUrl = `${appUrl}/api/tonconnect-manifest`;
         
         console.log('[TON Connect] Initializing with manifest:', manifestUrl);
           
@@ -2062,21 +2063,40 @@
           
           // Always set up click handler for fallback button
           if (fallbackBtn) {
-            fallbackBtn.onclick = (e) => {
+            fallbackBtn.onclick = async (e) => {
               e.preventDefault();
               e.stopPropagation();
               console.log('[TON Connect] Fallback button clicked');
-              if (tonConnectUI) {
-                try {
-                  console.log('[TON Connect] Opening modal...');
-                  tonConnectUI.openModal();
-                } catch (error) {
-                  console.error('[TON Connect] Error opening modal:', error);
-                  alert('Error connecting TON wallet. Please try again.');
-                }
-              } else {
+              
+              if (!tonConnectUI) {
                 console.error('[TON Connect] tonConnectUI not initialized');
                 alert('TON Connect is not initialized. Please refresh the page.');
+                return;
+              }
+              
+              try {
+                console.log('[TON Connect] Opening modal...');
+                fallbackBtn.disabled = true;
+                fallbackBtn.textContent = 'Connecting...';
+                
+                // Open modal with timeout
+                const modalPromise = tonConnectUI.openModal();
+                const timeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Connection timeout')), 30000)
+                );
+                
+                await Promise.race([modalPromise, timeoutPromise]);
+                
+              } catch (error) {
+                console.error('[TON Connect] Error opening modal:', error);
+                fallbackBtn.disabled = false;
+                fallbackBtn.textContent = 'Connect TON';
+                
+                if (error.message === 'Connection timeout') {
+                  alert('Connection is taking too long. Please check your internet connection and try again.');
+                } else {
+                  alert('Error connecting TON wallet: ' + error.message);
+                }
               }
             };
           }
