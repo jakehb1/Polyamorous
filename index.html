@@ -6,8 +6,44 @@
   <title>Polygram · Trade Predictions</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@2.3.1/dist/tonconnect-ui.min.js" 
-          onerror="console.warn('TON Connect UI failed to load from unpkg, trying jsdelivr...'); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.3.1/dist/tonconnect-ui.min.js'; s.onerror=function(){console.warn('TON Connect UI failed to load from both CDNs - feature will be disabled');}; document.head.appendChild(s);"></script>
+  <!-- Load TON Connect UI with fallback CDN -->
+  <script>
+    (function() {
+      function loadTONConnect() {
+        return new Promise((resolve, reject) => {
+          // Try unpkg first
+          const script1 = document.createElement('script');
+          script1.src = 'https://unpkg.com/@tonconnect/ui@2.3.1/dist/tonconnect-ui.min.js';
+          script1.onload = () => {
+            console.log('[TON Connect] Loaded from unpkg');
+            resolve();
+          };
+          script1.onerror = () => {
+            console.warn('[TON Connect] unpkg failed, trying jsdelivr...');
+            // Try jsdelivr as fallback
+            const script2 = document.createElement('script');
+            script2.src = 'https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.3.1/dist/tonconnect-ui.min.js';
+            script2.onload = () => {
+              console.log('[TON Connect] Loaded from jsdelivr');
+              resolve();
+            };
+            script2.onerror = () => {
+              console.error('[TON Connect] Failed to load from both CDNs');
+              // Don't reject - allow app to continue without TON Connect
+              resolve();
+            };
+            document.head.appendChild(script2);
+          };
+          document.head.appendChild(script1);
+        });
+      }
+      
+      // Load TON Connect UI
+      loadTONConnect().then(() => {
+        console.log('[TON Connect] Library loading complete');
+      });
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
