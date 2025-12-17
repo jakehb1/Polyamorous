@@ -2113,23 +2113,40 @@
                 // Open modal - for Telegram it should use Telegram Wallet
                 // Note: openModal() returns a promise that resolves when user connects
                 // We don't await it to avoid blocking, but we handle errors
-                const modalPromise = tonConnectUI.openModal().catch(err => {
-                  console.error('[TON Connect] Modal error:', err);
+                try {
+                  const modalPromise = tonConnectUI.openModal().catch(err => {
+                    console.error('[TON Connect] Modal error:', err);
+                    fallbackBtn.disabled = false;
+                    fallbackBtn.textContent = originalText;
+                    
+                    if (isTelegram) {
+                      alert('Failed to connect wallet. Please:\n1. Make sure Telegram Wallet is enabled in Telegram Settings\n2. Try again\n\nIf the modal is stuck, close and reopen the app.');
+                    } else {
+                      alert('Failed to open wallet connection. Please try again.');
+                    }
+                  });
+                  
+                  console.log('[TON Connect] Modal open called (non-blocking)');
+                  
+                  // Show helpful message for Telegram users
+                  if (isTelegram) {
+                    console.log('[TON Connect] If modal is stuck loading:\n1. Check if Telegram Wallet is enabled\n2. Try closing and reopening the app\n3. The modal should show wallet options');
+                  }
+                  
+                  // Reset button after a delay (user can click again if needed)
+                  setTimeout(() => {
+                    fallbackBtn.disabled = false;
+                    fallbackBtn.textContent = originalText;
+                  }, 2000);
+                  
+                  // Don't await - let modal handle its own lifecycle
+                  // The onStatusChange handler will update UI when wallet connects
+                } catch (openError) {
+                  console.error('[TON Connect] Error opening modal:', openError);
                   fallbackBtn.disabled = false;
                   fallbackBtn.textContent = originalText;
-                  alert('Failed to open wallet connection. Please try again or check if Telegram Wallet is enabled.');
-                });
-                
-                console.log('[TON Connect] Modal open called (non-blocking)');
-                
-                // Reset button after a delay (user can click again if needed)
-                setTimeout(() => {
-                  fallbackBtn.disabled = false;
-                  fallbackBtn.textContent = originalText;
-                }, 3000);
-                
-                // Don't await - let modal handle its own lifecycle
-                // The onStatusChange handler will update UI when wallet connects
+                  alert('Error: ' + openError.message);
+                }
                 
               } catch (error) {
                 console.error('[TON Connect] Error opening modal:', error);
