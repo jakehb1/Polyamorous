@@ -1661,7 +1661,7 @@
       <div class="balance-top-bar"></div>
       <div class="balance-amount" id="totalBalance">$0.00</div>
       <div class="balance-breakdown" id="balanceBreakdown">
-        USDC: <span id="usdcBalance">$0.00</span> | Positions: <span id="positionsValue">$0.00</span>
+        Trading Balance (USDC): <span id="usdcBalance">$0.00</span> | Positions: <span id="positionsValue">$0.00</span>
       </div>
       <div class="balance-dot"></div>
     </div>
@@ -1669,36 +1669,6 @@
     <!-- Wallet Card -->
     <div class="card">
       <div class="wallet-section">
-        <div class="wallet-row">
-          <div class="wallet-label">
-            <span class="wallet-icon">◎</span>
-            <span>SOL Wallet</span>
-          </div>
-          <div class="wallet-address-row">
-            <span class="wallet-address" id="solWalletAddress" title="Click to copy">Loading...</span>
-            <button class="copy-btn" id="copySolBtn" title="Copy SOL address">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="wallet-row">
-          <div class="wallet-label">
-            <span class="wallet-icon">$</span>
-            <span>USDC Wallet</span>
-          </div>
-          <div class="wallet-address-row">
-            <span class="wallet-address" id="usdcWalletAddress" title="Click to copy">Loading...</span>
-            <button class="copy-btn" id="copyUsdcBtn" title="Copy USDC address">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
         <div class="wallet-row">
           <div class="wallet-label">
             <span class="wallet-icon">💎</span>
@@ -1864,50 +1834,35 @@
   <div class="modal-overlay" id="fundModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <h3 class="modal-title" id="fundModalTitle">Fund Wallet</h3>
-      <p class="modal-subtitle" id="fundModalSubtitle">Send funds to your wallet address</p>
+      <h3 class="modal-title" id="fundModalTitle">Fund with TON</h3>
+      <p class="modal-subtitle" id="fundModalSubtitle">Connect your TON wallet to fund your account</p>
       
       <div class="fund-info" id="fundInfo">
-        <div class="fund-currency-selector">
-          <button class="currency-btn active" data-currency="usdc">USDC</button>
-          <button class="currency-btn" data-currency="sol">SOL</button>
-        </div>
-        
-        <div class="fund-amount">
-          <label>Amount</label>
-          <input type="number" id="fundAmount" placeholder="10.00" min="1" step="0.01" />
-        </div>
-        
-        <div class="fund-address-section">
-          <label>Send to this address:</label>
-          <div class="fund-address-display">
-            <code id="fundAddress">Loading...</code>
-            <button class="copy-btn" id="copyFundAddressBtn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
+        <div class="fund-ton-section">
+          <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 14px;">
+            Connect your TON wallet to fund your account. Funds will be automatically bridged to Polygon USDC for trading.
+          </p>
+          
+          <div id="tonWalletStatus" style="padding: 16px; background: var(--bg); border-radius: 12px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <span style="font-weight: 600;">TON Wallet Status:</span>
+              <span id="tonWalletStatusText" style="color: var(--text-muted);">Not Connected</span>
+            </div>
+            <div id="tonWalletAddressDisplay" style="font-family: monospace; font-size: 12px; color: var(--text); word-break: break-all; margin-bottom: 12px; display: none;"></div>
+            <div id="tonConnectButtonArea"></div>
           </div>
-        </div>
-        
-        <div class="fund-instructions" id="fundInstructions">
-          <p>Send USDC (Polygon network) to the address above. Minimum deposit: $10</p>
-        </div>
-        
-        <div class="fund-summary">
-          <div class="fund-summary-row">
-            <span>Network</span>
-            <span id="fundNetwork">Polygon</span>
-          </div>
-          <div class="fund-summary-row">
-            <span>Minimum</span>
-            <span id="fundMinimum">$10.00</span>
+          
+          <div class="fund-amount" style="margin-top: 16px;">
+            <label>Amount to Bridge (TON)</label>
+            <input type="number" id="fundAmount" placeholder="10.00" min="0.1" step="0.01" />
+            <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 4px;">
+              Minimum: 0.1 TON. Funds will be bridged to Polygon USDC for trading.
+            </small>
           </div>
         </div>
       </div>
       
-      <button class="trade-submit" id="fundSubmitBtn">I've Sent the Funds</button>
+      <button class="trade-submit" id="fundSubmitBtn">Bridge TON to Polygon USDC</button>
       <button class="modal-close-btn" id="closeFundModal">Cancel</button>
     </div>
   </div>
@@ -2539,32 +2494,26 @@
         
         state.wallet = wallet;
         
-        console.log('Wallet loaded:', wallet.polygon, wallet.solana, wallet.ton || 'TON not connected', data.isNew ? '(new)' : '(existing)');
+        console.log('Wallet loaded:', 'Polygon:', wallet.polygon, 'TON:', wallet.ton || 'not connected', data.isNew ? '(new)' : '(existing)');
         
-        // Display SOL wallet
-        const solEl = document.getElementById('solWalletAddress');
-        if (solEl) solEl.textContent = wallet.solana;
-        
-        // Display USDC wallet (Polygon)
-        const usdcEl = document.getElementById('usdcWalletAddress');
-        if (usdcEl) usdcEl.textContent = wallet.polygon;
-        
-        // Display TON wallet
+        // Display TON wallet (only wallet shown to user)
         const tonEl = document.getElementById('tonWalletAddress');
         const tonCopyBtn = document.getElementById('copyTonBtn');
         const connectContainer = document.getElementById('tonConnectButtonContainer');
+        const fallbackBtn = document.getElementById('connectTonBtnFallback');
+        
         if (tonEl) {
           if (wallet.ton) {
             tonEl.textContent = wallet.ton;
             if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
             if (connectContainer) connectContainer.style.display = 'none';
+            if (fallbackBtn) fallbackBtn.style.display = 'none';
             setupCopyButton('copyTonBtn', wallet.ton);
             setupClickableAddress('tonWalletAddress', wallet.ton);
           } else {
             tonEl.textContent = 'Not connected';
             if (tonCopyBtn) tonCopyBtn.style.display = 'none';
             if (connectContainer) connectContainer.style.display = 'block';
-            const fallbackBtn = document.getElementById('connectTonBtnFallback');
             if (fallbackBtn) fallbackBtn.style.display = 'inline-flex';
           }
         }
@@ -2574,35 +2523,27 @@
         if (statusEl) {
           // Check for warnings (like encryption key missing)
           if (data.warning || data.error === 'encryption_key_missing') {
-            statusEl.textContent = '⚠ Wallets created (not saved - config issue)';
+            statusEl.textContent = '⚠ Wallet created (not saved - config issue)';
             statusEl.style.background = 'var(--yellow)';
             statusEl.style.color = 'var(--text)';
             console.warn('Wallet warning:', data.warning || data.help);
           } else {
-            if (data.isNew) {
-              statusEl.textContent = '✓ Wallets created - fund to trade';
+            if (wallet.ton) {
+              statusEl.textContent = '✓ TON wallet connected - ready to fund';
             } else {
-              statusEl.textContent = '✓ Wallets loaded - fund to trade';
+              statusEl.textContent = '✓ Connect TON wallet to fund your account';
             }
             statusEl.style.background = 'var(--accent)';
             statusEl.style.color = 'white';
           }
         }
         
-        // Setup copy buttons and make addresses clickable
-        setupCopyButton('copySolBtn', wallet.solana);
-        setupCopyButton('copyUsdcBtn', wallet.polygon);
-        setupClickableAddress('solWalletAddress', wallet.solana);
-        setupClickableAddress('usdcWalletAddress', wallet.polygon);
-        
         // If TON address exists in wallet but not connected in TON Connect, show it
         if (wallet.ton && tonConnectUI && !tonConnectUI.wallet) {
-          const tonEl = document.getElementById('tonWalletAddress');
-          const tonCopyBtn = document.getElementById('copyTonBtn');
-          const connectContainer = document.getElementById('tonConnectButtonContainer');
           if (tonEl) tonEl.textContent = wallet.ton;
           if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
           if (connectContainer) connectContainer.style.display = 'none';
+          if (fallbackBtn) fallbackBtn.style.display = 'none';
           setupCopyButton('copyTonBtn', wallet.ton);
           setupClickableAddress('tonWalletAddress', wallet.ton);
         }
@@ -2612,12 +2553,10 @@
         
       } catch (err) {
         console.error('Wallet error:', err);
-        const solEl = document.getElementById('solWalletAddress');
-        const usdcEl = document.getElementById('usdcWalletAddress');
+        const tonEl = document.getElementById('tonWalletAddress');
         const statusEl = document.getElementById('walletStatusBar');
         
-        if (solEl) solEl.textContent = 'Error loading';
-        if (usdcEl) usdcEl.textContent = 'Error loading';
+        if (tonEl) tonEl.textContent = 'Error loading';
         
         // Show user-friendly error message
         let errorMsg = 'Error loading wallet';
@@ -3779,47 +3718,33 @@
     // =====================
     // FUNDING
     // =====================
-    let currentFundingCurrency = 'usdc';
-
-    function openFundModal(currency = 'usdc') {
+    function openFundModal() {
       hapticFeedback('medium');
-      currentFundingCurrency = currency;
       const modal = document.getElementById('fundModal');
-      const title = document.getElementById('fundModalTitle');
-      const subtitle = document.getElementById('fundModalSubtitle');
-      const addressEl = document.getElementById('fundAddress');
-      const networkEl = document.getElementById('fundNetwork');
-      const minimumEl = document.getElementById('fundMinimum');
-      const instructionsEl = document.getElementById('fundInstructions');
-
-      // Update currency buttons
-      document.querySelectorAll('.currency-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.currency === currency) {
-          btn.classList.add('active');
-        }
-      });
-
-      if (!state.wallet) {
-        alert('Please create a wallet first');
+      
+      // Check if TON wallet is connected
+      if (!state.wallet || !state.wallet.ton) {
+        alert('Please connect your TON wallet first. Click "Connect TON" in the wallet section.');
         return;
       }
 
-      const walletAddress = currency === 'usdc' ? state.wallet.polygon : state.wallet.solana;
-      addressEl.textContent = walletAddress;
-
-      if (currency === 'usdc') {
-        title.textContent = 'Fund USDC Wallet';
-        subtitle.textContent = 'Send USDC to your Polygon wallet';
-        networkEl.textContent = 'Polygon';
-        minimumEl.textContent = '$10.00';
-        instructionsEl.innerHTML = '<p>Send USDC (Polygon network) to the address above. Minimum deposit: $10. Make sure you\'re sending on the Polygon network, not Ethereum.</p>';
-      } else {
-        title.textContent = 'Fund SOL Wallet';
-        subtitle.textContent = 'Send SOL to your Solana wallet';
-        networkEl.textContent = 'Solana';
-        minimumEl.textContent = '0.1 SOL';
-        instructionsEl.innerHTML = '<p>Send SOL to the address above. Minimum deposit: 0.1 SOL. Make sure you\'re sending on the Solana network.</p>';
+      // Update TON wallet status in modal
+      const tonStatusText = document.getElementById('tonWalletStatusText');
+      const tonAddressDisplay = document.getElementById('tonWalletAddressDisplay');
+      const tonConnectArea = document.getElementById('tonConnectButtonArea');
+      
+      if (tonStatusText) {
+        tonStatusText.textContent = 'Connected';
+        tonStatusText.style.color = 'var(--green)';
+      }
+      
+      if (tonAddressDisplay && state.wallet.ton) {
+        tonAddressDisplay.textContent = state.wallet.ton;
+        tonAddressDisplay.style.display = 'block';
+      }
+      
+      if (tonConnectArea) {
+        tonConnectArea.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">✓ TON wallet connected</p>';
       }
 
       document.getElementById('fundAmount').value = '';
@@ -3833,7 +3758,6 @@
 
     async function submitFunding() {
       const amount = parseFloat(document.getElementById('fundAmount').value);
-      const currency = currentFundingCurrency;
 
       if (!amount || amount <= 0) {
         hapticFeedback('error');
@@ -3841,56 +3765,49 @@
         return;
       }
 
-      const minAmount = currency === 'usdc' ? 10 : 0.1;
+      const minAmount = 0.1; // Minimum 0.1 TON
       if (amount < minAmount) {
         hapticFeedback('error');
-        alert(`Minimum deposit is ${currency === 'usdc' ? '$' : ''}${minAmount}${currency === 'sol' ? ' SOL' : ''}`);
+        alert(`Minimum bridge amount is ${minAmount} TON`);
+        return;
+      }
+
+      // Check TON wallet is connected
+      if (!state.wallet || !state.wallet.ton) {
+        hapticFeedback('error');
+        alert('Please connect your TON wallet first');
         return;
       }
 
       const submitBtn = document.getElementById('fundSubmitBtn');
       const originalText = submitBtn.textContent;
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Processing...';
+      submitBtn.textContent = 'Bridging...';
       hapticFeedback('medium');
 
       try {
-        const walletAddress = currency === 'usdc' ? state.wallet.polygon : state.wallet.solana;
-
-        const resp = await fetch('/api/fund', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            telegram_id: state.telegramId,
-            currency: currency,
-            amount: amount,
-            payment_method: 'crypto',
-            wallet_address: walletAddress
-          })
-        });
-
-        const data = await resp.json();
-
-        if (!resp.ok) {
-          throw new Error(data.message || data.error || 'Funding failed');
-        }
-
-        if (data.success) {
-          hapticFeedback('success');
-          alert(`Funding instructions:\n\n${data.instructions}\n\nYour balance will update once the transaction is confirmed on-chain.`);
-          closeFundModal();
-          // Refresh balance after a delay
-          setTimeout(() => loadBalance(), 2000);
-        } else {
-          throw new Error(data.message || 'Funding failed');
-        }
+        // Call bridge API to bridge TON to Polygon USDC
+        // TODO: This will be implemented in Phase 2 - for now, show message
+        alert('Bridge functionality coming soon! This will bridge your TON to Polygon USDC for trading.\n\nAmount: ' + amount + ' TON');
+        
+        // For now, just close the modal
+        closeFundModal();
+        
+        // TODO: Once bridge API is ready, call it here:
+        // const resp = await fetch('/api/bridge/ton-to-polygon', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     telegram_id: state.telegramId,
+        //     amount: amount,
+        //     ton_address: state.wallet.ton
+        //   })
+        // });
 
       } catch (err) {
         console.error('[submitFunding] Error:', err);
         hapticFeedback('error');
-        alert(`Funding failed: ${err.message}`);
+        alert(`Bridge failed: ${err.message}`);
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
@@ -4188,15 +4105,7 @@
         closeFundModal();
       });
 
-      // Currency selector
-      document.querySelectorAll('.currency-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const currency = btn.dataset.currency;
-          document.querySelectorAll('.currency-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          openFundModal(currency);
-        });
-      });
+      // Currency selector removed - only TON funding now
 
       // Copy fund address button
       document.getElementById('copyFundAddressBtn')?.addEventListener('click', async () => {
