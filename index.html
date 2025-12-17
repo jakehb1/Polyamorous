@@ -4026,6 +4026,53 @@
     }
 
     // =====================
+    // ERROR HANDLING (Epic 7.1)
+    // =====================
+    // Epic 7.1: Enhanced Error Handling - User-friendly error messages
+    function showError(message, title = 'Error') {
+      // Use Telegram WebApp showAlert if available, otherwise use browser alert
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert(message);
+      } else {
+        alert(`${title}: ${message}`);
+      }
+    }
+
+    function showSuccess(message, title = 'Success') {
+      // Use Telegram WebApp showAlert if available
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert(message);
+      } else {
+        // For success, use alert for now (could use toast notification)
+        alert(message);
+      }
+    }
+
+    // Map error codes to user-friendly messages
+    function getErrorMessage(errorCode, defaultMessage) {
+      const errorMessages = {
+        'authentication_required': 'Please connect your TON wallet to continue',
+        'invalid_session': 'Your session has expired. Please reconnect your wallet.',
+        'session_expired': 'Your session has expired. Please reconnect your wallet.',
+        'insufficient_balance': defaultMessage || 'You don\'t have enough balance for this transaction',
+        'wallet_not_found': 'Wallet not found. Please create a wallet first.',
+        'rate_limit_exceeded': 'Too many requests. Please wait a moment and try again.',
+        'invalid_nonce': 'This request has already been processed. Please try again.',
+        'idempotency_key_conflict': 'This transaction was already submitted.',
+        'invalid_amount': defaultMessage || 'Please enter a valid amount',
+        'invalid_address': defaultMessage || 'Please enter a valid address',
+        'address_not_confirmed': 'Please confirm your withdrawal address first.',
+        'network_error': 'Network error. Please check your connection and try again.',
+        'bridge_failed': 'Bridge transaction failed. Please try again later.',
+        'transaction_failed': 'Transaction failed. Please try again.',
+        'database_not_configured': 'Service temporarily unavailable. Please try again later.',
+        'internal_error': 'An unexpected error occurred. Please try again later.'
+      };
+
+      return errorMessages[errorCode] || defaultMessage || 'An error occurred. Please try again.';
+    }
+
+    // =====================
     // FUNDING
     // =====================
     function openFundModal() {
@@ -4194,16 +4241,10 @@
         const data = await resp.json();
 
         if (!resp.ok) {
-          if (resp.status === 401) {
-            throw new Error('Session expired. Please reconnect your TON wallet.');
-          } else if (resp.status === 429) {
-            throw new Error('Too many withdrawal requests. Please wait a moment.');
-          } else if (resp.status === 400 && data.error === 'insufficient_balance') {
-            throw new Error(data.message || 'Insufficient balance for this withdrawal.');
-          } else if (resp.status === 400 && data.error === 'address_not_confirmed') {
-            throw new Error('Destination address must be confirmed. Please sign the address confirmation.');
-          }
-          throw new Error(data.message || data.error || 'Withdrawal failed');
+          // Epic 7.1: Enhanced error handling
+          const errorCode = data.error || 'internal_error';
+          const errorMessage = getErrorMessage(errorCode, data.message);
+          throw new Error(errorMessage);
         }
 
         if (data.success) {
@@ -4229,7 +4270,7 @@
       } catch (err) {
         console.error('[submitWithdrawal] Error:', err);
         hapticFeedback('error');
-        alert(`Withdrawal failed: ${err.message}`);
+        showError(err.message, 'Withdrawal Failed');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
@@ -4321,7 +4362,7 @@
       } catch (err) {
         console.error('[submitFunding] Error:', err);
         hapticFeedback('error');
-        alert(`Deposit failed: ${err.message}`);
+        showError(err.message, 'Deposit Failed');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
@@ -4636,15 +4677,10 @@
         const data = await resp.json();
 
         if (!resp.ok) {
-          // Handle specific error cases
-          if (resp.status === 401) {
-            throw new Error('Session expired. Please reconnect your TON wallet.');
-          } else if (resp.status === 429) {
-            throw new Error('Too many requests. Please wait a moment and try again.');
-          } else if (resp.status === 400 && data.error === 'insufficient_balance') {
-            throw new Error(data.message || 'Insufficient balance for this trade.');
-          }
-          throw new Error(data.message || data.error || 'Trade failed');
+          // Epic 7.1: Enhanced error handling with user-friendly messages
+          const errorCode = data.error || 'internal_error';
+          const errorMessage = getErrorMessage(errorCode, data.message);
+          throw new Error(errorMessage);
         }
 
         if (data.success) {
@@ -4675,7 +4711,7 @@
       } catch (err) {
         console.error('[executeTrade] Error:', err);
         hapticFeedback('error');
-        alert(`Trade failed: ${err.message}`);
+        showError(err.message, 'Trade Failed');
       } finally {
         // Re-enable button
         submitBtn.disabled = false;
