@@ -2046,16 +2046,29 @@
         const manifestUrl = `${appUrl}/api/tonconnect-manifest`;
         
         console.log('[TON Connect] Initializing with manifest:', manifestUrl);
+        
+        // Check if we're in Telegram environment
+        const isTelegram = window.Telegram?.WebApp !== undefined;
+        console.log('[TON Connect] Telegram environment:', isTelegram);
           
-          tonConnectUI = new TonConnectUI({
-            manifestUrl: manifestUrl,
-            buttonRootId: 'tonConnectButtonContainer',
-            language: 'en',
-            uiPreferences: {
-              theme: 'LIGHT',
-              borderRadius: 'm'
-            }
-          });
+        tonConnectUI = new TonConnectUI({
+          manifestUrl: manifestUrl,
+          buttonRootId: 'tonConnectButtonContainer',
+          language: 'en',
+          uiPreferences: {
+            theme: 'LIGHT',
+            borderRadius: 'm'
+          },
+          // Use TON Foundation's bridge service instead of localhost
+          // This fixes the ERR_CONNECTION_REFUSED errors
+          bridgeUrl: 'https://connect.ton.org/bridge',
+          // Telegram-specific configuration
+          actionsConfiguration: {
+            twaReturnUrl: isTelegram ? window.location.href : undefined
+          }
+        });
+        
+        console.log('[TON Connect] Initialized with TON Foundation bridge service');
 
           // Set up fallback button click handler immediately
           const connectContainer = document.getElementById('tonConnectButtonContainer');
@@ -2079,13 +2092,23 @@
                 fallbackBtn.disabled = true;
                 fallbackBtn.textContent = 'Connecting...';
                 
-                // Open modal with timeout
-                const modalPromise = tonConnectUI.openModal();
+                // Open modal with shorter timeout and better error handling
+                const modalPromise = tonConnectUI.openModal().catch(err => {
+                  console.error('[TON Connect] Modal error:', err);
+                  throw err;
+                });
+                
                 const timeoutPromise = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Connection timeout')), 30000)
+                  setTimeout(() => reject(new Error('Connection timeout - please try again')), 15000)
                 );
                 
                 await Promise.race([modalPromise, timeoutPromise]);
+                
+                // Reset button after successful modal open (modal handles its own state)
+                setTimeout(() => {
+                  fallbackBtn.disabled = false;
+                  fallbackBtn.textContent = 'Connect TON';
+                }, 1000);
                 
               } catch (error) {
                 console.error('[TON Connect] Error opening modal:', error);
