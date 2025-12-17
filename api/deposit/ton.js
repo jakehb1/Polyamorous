@@ -4,6 +4,7 @@
 
 const { createClient } = require("@supabase/supabase-js");
 const { validateSession } = require("../middleware/validate-session");
+const { handleApiError, ERROR_CODES } = require("../lib/errors");
 const crypto = require("crypto");
 
 module.exports = async (req, res) => {
@@ -197,10 +198,9 @@ module.exports = async (req, res) => {
     }
 
   } catch (err) {
-    console.error("[deposit/ton] Error:", err);
-    return res.status(500).json({
-      error: "deposit_operation_failed",
-      message: err.message
+    return handleApiError(err, req, res, {
+      operation: 'deposit',
+      endpoint: '/api/deposit/ton'
     });
   }
 };

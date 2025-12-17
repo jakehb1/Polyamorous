@@ -4,6 +4,7 @@
 // Or can be polled to check for new deposits
 
 const { createClient } = require("@supabase/supabase-js");
+const { handleApiError, validateTONAddress, ERROR_CODES } = require("../lib/errors");
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -43,8 +44,18 @@ module.exports = async (req, res) => {
 
     if (!ton_tx_hash || !ton_address || !amount_ton) {
       return res.status(400).json({
-        error: "missing_required_fields",
+        error: ERROR_CODES.MISSING_REQUIRED_FIELDS,
         message: "ton_tx_hash, ton_address, and amount_ton are required"
+      });
+    }
+
+    // Validate TON address
+    try {
+      validateTONAddress(ton_address);
+    } catch (validationError) {
+      return res.status(400).json({
+        error: ERROR_CODES.INVALID_ADDRESS,
+        message: validationError.message
       });
     }
 
@@ -217,10 +228,9 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("[deposit/detect] Error:", err);
-    return res.status(500).json({
-      error: "deposit_detection_failed",
-      message: err.message
+    return handleApiError(err, req, res, {
+      operation: 'deposit_detection',
+      endpoint: '/api/deposit/detect'
     });
   }
 };
