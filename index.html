@@ -2211,6 +2211,68 @@
      * For non-team markets with Yes/No outcomes, uses Polymarket pattern (green for Yes, red for No)
      * Otherwise generates a color based on market
      */
+    // Extract team abbreviation from team name
+    function extractTeamAbbreviation(teamName) {
+      if (!teamName) return '';
+      const name = teamName.toLowerCase().trim();
+      
+      // Map of team names to abbreviations
+      const teamAbbrs = {
+        'bills': 'BUF', 'buffalo bills': 'BUF', 'buffalo': 'BUF',
+        'dolphins': 'MIA', 'miami dolphins': 'MIA', 'miami': 'MIA',
+        'patriots': 'NE', 'new england patriots': 'NE', 'new england': 'NE',
+        'jets': 'NYJ', 'new york jets': 'NYJ',
+        'ravens': 'BAL', 'baltimore ravens': 'BAL', 'baltimore': 'BAL',
+        'bengals': 'CIN', 'cincinnati bengals': 'CIN', 'cincinnati': 'CIN',
+        'browns': 'CLE', 'cleveland browns': 'CLE', 'cleveland': 'CLE',
+        'steelers': 'PIT', 'pittsburgh steelers': 'PIT', 'pittsburgh': 'PIT',
+        'texans': 'HOU', 'houston texans': 'HOU', 'houston': 'HOU',
+        'colts': 'IND', 'indianapolis colts': 'IND', 'indianapolis': 'IND',
+        'jaguars': 'JAX', 'jacksonville jaguars': 'JAX', 'jacksonville': 'JAX',
+        'titans': 'TEN', 'tennessee titans': 'TEN', 'tennessee': 'TEN',
+        'broncos': 'DEN', 'denver broncos': 'DEN', 'denver': 'DEN',
+        'chiefs': 'KC', 'kansas city chiefs': 'KC', 'kansas city': 'KC',
+        'raiders': 'LV', 'las vegas raiders': 'LV', 'oakland raiders': 'LV',
+        'chargers': 'LAC', 'los angeles chargers': 'LAC',
+        'cowboys': 'DAL', 'dallas cowboys': 'DAL', 'dallas': 'DAL',
+        'giants': 'NYG', 'new york giants': 'NYG',
+        'eagles': 'PHI', 'philadelphia eagles': 'PHI', 'philadelphia': 'PHI',
+        'commanders': 'WAS', 'washington commanders': 'WAS', 'washington': 'WAS', 'wsh': 'WAS',
+        'bears': 'CHI', 'chicago bears': 'CHI', 'chicago': 'CHI',
+        'lions': 'DET', 'detroit lions': 'DET', 'detroit': 'DET',
+        'packers': 'GB', 'green bay packers': 'GB', 'green bay': 'GB',
+        'vikings': 'MIN', 'minnesota vikings': 'MIN', 'minnesota': 'MIN',
+        'falcons': 'ATL', 'atlanta falcons': 'ATL', 'atlanta': 'ATL',
+        'panthers': 'CAR', 'carolina panthers': 'CAR', 'carolina': 'CAR',
+        'saints': 'NO', 'new orleans saints': 'NO', 'new orleans': 'NO',
+        'buccaneers': 'TB', 'tampa bay buccaneers': 'TB', 'tampa bay': 'TB',
+        'cardinals': 'ARI', 'arizona cardinals': 'ARI', 'arizona': 'ARI',
+        'rams': 'LAR', 'los angeles rams': 'LAR',
+        '49ers': 'SF', 'san francisco 49ers': 'SF', 'san francisco': 'SF',
+        'seahawks': 'SEA', 'seattle seahawks': 'SEA', 'seattle': 'SEA'
+      };
+      
+      // Check exact matches first
+      if (teamAbbrs[name]) return teamAbbrs[name];
+      
+      // Check partial matches
+      for (const [key, abbr] of Object.entries(teamAbbrs)) {
+        if (name.includes(key) || key.includes(name)) {
+          return abbr;
+        }
+      }
+      
+      // If no match, return first 3 uppercase letters
+      return teamName.substring(0, 3).toUpperCase();
+    }
+    
+    // Get team color from team name
+    function getTeamColor(teamName) {
+      if (!teamName) return null;
+      const name = teamName.toLowerCase().trim();
+      return NFL_TEAM_COLORS[name] || null;
+    }
+    
     function getOutcomeColor(market, outcome, outcomeIndex) {
       if (!market || !outcome) return '#003366'; // Default blue
       
@@ -3141,11 +3203,37 @@
           const eventImg = event.eventImage || event.markets[0]?.image || '';
           const hasImage = eventImg && eventImg.trim() !== '';
           
-          // Get week tag if available
-          const weekTag = event.markets[0]?.eventTags?.find(t => 
-            (typeof t === 'string' ? t : (t.slug || t.label || '')).toLowerCase().includes('week')
-          );
-          const weekLabel = weekTag ? (typeof weekTag === 'string' ? weekTag : (weekTag.label || weekTag.slug || '')) : '';
+          // Parse teams from event title (e.g., "Eagles vs Commanders" or "PHI vs WSH")
+          const eventTitle = event.eventTitle || '';
+          const teamMatch = eventTitle.match(/(.+?)\s+(?:vs|v\.?|@)\s+(.+)/i);
+          let team1 = '', team2 = '';
+          if (teamMatch) {
+            team1 = teamMatch[1].trim();
+            team2 = teamMatch[2].trim();
+          } else {
+            // Fallback: try to split by common separators
+            const parts = eventTitle.split(/[\s\-]+/);
+            if (parts.length >= 2) {
+              team1 = parts[0];
+              team2 = parts[parts.length - 1];
+            }
+          }
+          
+          // Get team abbreviations and colors
+          const team1Abbr = extractTeamAbbreviation(team1);
+          const team2Abbr = extractTeamAbbreviation(team2);
+          const team1Color = getTeamColor(team1) || '#003366';
+          const team2Color = getTeamColor(team2) || '#003366';
+          
+          // Format event date/time
+          let eventDateTime = '';
+          if (event.eventStartDate) {
+            const eventDate = new Date(event.eventStartDate);
+            if (!isNaN(eventDate.getTime())) {
+              const options = { weekday: 'short', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+              eventDateTime = eventDate.toLocaleDateString('en-US', options);
+            }
+          }
           
           // Find primary moneyline market (the main game outcome)
           const moneylineMarket = event.markets.find(m => {
@@ -3159,51 +3247,42 @@
           const primaryOutcomes = moneylineMarket?.outcomes || [];
           const price1 = primaryPrices[0] !== undefined ? (parseFloat(primaryPrices[0]) * 100).toFixed(0) + '¢' : '--';
           const price2 = primaryPrices[1] !== undefined ? (parseFloat(primaryPrices[1]) * 100).toFixed(0) + '¢' : '--';
-          const outcome1 = primaryOutcomes[0] || 'Yes';
-          const outcome2 = primaryOutcomes[1] || 'No';
+          const outcome1 = primaryOutcomes[0] || team1 || 'Yes';
+          const outcome2 = primaryOutcomes[1] || team2 || 'No';
+          
+          // Get outcome colors
+          const outcome1Color = getOutcomeColor(moneylineMarket, outcome1, 0) || team1Color;
+          const outcome2Color = getOutcomeColor(moneylineMarket, outcome2, 1) || team2Color;
           
           return `
-            <div class="event-group" data-event-id="${event.eventId}">
+            <div class="event-group" data-event-id="${event.eventId}" style="cursor: pointer;" onclick="openGameDetail('${event.eventId}', ${JSON.stringify(event).replace(/"/g, '&quot;')})">
               <div class="event-header" style="padding: 16px; border-bottom: 1px solid var(--border);">
-                ${hasImage ? `<img class="event-image" src="${eventImg}" alt="" onerror="this.classList.add('hidden')" style="width: 40px; height: 40px; border-radius: 8px; margin-right: 12px; object-fit: cover;" />` : ''}
-                <div class="event-info" style="flex: 1;">
-                  <div class="event-title" style="font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--text);">
-                    ${event.eventTitle}
+                ${eventDateTime ? `<div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">${eventDateTime}</div>` : ''}
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    <div style="width: 48px; height: 48px; border-radius: 8px; background: ${team1Color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+                      ${team1Abbr || team1.substring(0, 3).toUpperCase()}
+                    </div>
+                    <div style="flex: 1;">
+                      <div style="font-size: 16px; font-weight: 600; color: var(--text);">${team1 || outcome1}</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">${price1}</div>
+                    </div>
                   </div>
-                  <div class="event-meta" style="font-size: 14px; color: var(--text-muted);">
-                    ${formatVolume(eventVol)} Vol.
+                  <div style="font-size: 14px; color: var(--text-muted); padding: 0 8px;">vs</div>
+                  <div style="display: flex; align-items: center; gap: 12px; flex: 1; flex-direction: row-reverse;">
+                    <div style="width: 48px; height: 48px; border-radius: 8px; background: ${team2Color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+                      ${team2Abbr || team2.substring(0, 3).toUpperCase()}
+                    </div>
+                    <div style="flex: 1; text-align: right;">
+                      <div style="font-size: 16px; font-weight: 600; color: var(--text);">${team2 || outcome2}</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">${price2}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="event-markets" data-event-markets="${event.eventId}" style="padding: 12px 16px;">
-                ${event.markets.map(m => {
-                  const prices = m.outcomePrices || [];
-                  const outcomes = m.outcomes || ["Yes", "No"];
-                  
-                  return `
-                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
-                      <div class="outcome-label" style="font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text);">${m.question}</div>
-                      <div class="outcome-buttons" style="display: flex; gap: 8px;">
-                        ${outcomes.map((outcome, idx) => {
-                          const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
-                          // Get team-specific color for this outcome
-                          const outcomeColor = getOutcomeColor(m, outcome, idx);
-                          return `
-                            <div class="outcome-button-group" style="display: flex; align-items: center; gap: 6px;">
-                              <span class="outcome-price" style="font-size: 14px; font-weight: 600; color: var(--text);">${price}</span>
-                              <button class="outcome-btn" 
-                                      data-market-id="${m.id}" 
-                                      data-outcome-index="${idx}"
-                                      style="padding: 6px 12px; border-radius: 6px; border: none; background: ${outcomeColor}; color: white; font-size: 14px; font-weight: 500; cursor: pointer;">
-                                ${outcome}
-                              </button>
-                            </div>
-                          `;
-                        }).join('')}
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--text-muted);">
+                  <span>${formatVolume(eventVol)} Vol.</span>
+                  <button style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; cursor: pointer;" onclick="event.stopPropagation(); openGameDetail('${event.eventId}', ${JSON.stringify(event).replace(/"/g, '&quot;')})">Game View →</button>
+                </div>
               </div>
             </div>
           `;
