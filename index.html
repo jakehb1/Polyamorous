@@ -2051,24 +2051,26 @@
         const isTelegram = window.Telegram?.WebApp !== undefined;
         console.log('[TON Connect] Telegram environment:', isTelegram);
           
-        tonConnectUI = new TonConnectUI({
+        // For Telegram Mini Apps, TON Connect should use Telegram Wallet natively
+        // Configure to use TON Foundation's bridge service (not localhost)
+        const tonConnectConfig = {
           manifestUrl: manifestUrl,
           buttonRootId: 'tonConnectButtonContainer',
           language: 'en',
           uiPreferences: {
             theme: 'LIGHT',
             borderRadius: 'm'
-          },
-          // Use TON Foundation's bridge service instead of localhost
-          // This fixes the ERR_CONNECTION_REFUSED errors
-          bridgeUrl: 'https://connect.ton.org/bridge',
-          // Telegram-specific configuration
-          actionsConfiguration: {
-            twaReturnUrl: isTelegram ? window.location.href : undefined
           }
-        });
+        };
         
-        console.log('[TON Connect] Initialized with TON Foundation bridge service');
+        // Only set bridgeUrl if not in Telegram (Telegram has its own bridge)
+        if (!isTelegram) {
+          tonConnectConfig.bridgeUrl = 'https://connect.ton.org/bridge';
+        }
+        
+        tonConnectUI = new TonConnectUI(tonConnectConfig);
+        
+        console.log('[TON Connect] Initialized', isTelegram ? 'for Telegram' : 'with TON Foundation bridge');
 
           // Set up fallback button click handler immediately
           const connectContainer = document.getElementById('tonConnectButtonContainer');
@@ -2090,25 +2092,40 @@
               try {
                 console.log('[TON Connect] Opening modal...');
                 fallbackBtn.disabled = true;
-                fallbackBtn.textContent = 'Connecting...';
+                fallbackBtn.textContent = 'Opening...';
                 
-                // Open modal with shorter timeout and better error handling
-                const modalPromise = tonConnectUI.openModal().catch(err => {
-                  console.error('[TON Connect] Modal error:', err);
-                  throw err;
-                });
+                // Open modal with timeout - if it hangs, allow user to cancel
+                let modalOpened = false;
+                const openModal = async () => {
+                  try {
+                    await tonConnectUI.openModal();
+                    modalOpened = true;
+                  } catch (err) {
+                    console.error('[TON Connect] Modal error:', err);
+                    throw err;
+                  }
+                };
                 
+                // Set a shorter timeout for Telegram (should be instant)
+                const timeout = isTelegram ? 5000 : 10000;
                 const timeoutPromise = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Connection timeout - please try again')), 15000)
+                  setTimeout(() => {
+                    if (!modalOpened) {
+                      reject(new Error('Connection timeout - the wallet modal did not open. Please try again or check your Telegram Wallet settings.'));
+                    }
+                  }, timeout)
                 );
                 
-                await Promise.race([modalPromise, timeoutPromise]);
+                await Promise.race([openModal(), timeoutPromise]);
                 
-                // Reset button after successful modal open (modal handles its own state)
+                // If we get here, modal opened successfully
+                console.log('[TON Connect] Modal opened successfully');
+                
+                // Reset button after a short delay
                 setTimeout(() => {
                   fallbackBtn.disabled = false;
                   fallbackBtn.textContent = 'Connect TON';
-                }, 1000);
+                }, 500);
                 
               } catch (error) {
                 console.error('[TON Connect] Error opening modal:', error);
