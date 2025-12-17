@@ -5,6 +5,7 @@
 
 const { createClient } = require("@supabase/supabase-js");
 const { handleApiError, validateTONAddress, ERROR_CODES } = require("../lib/errors");
+const { logError, logTransaction, logSecurityEvent } = require("../lib/logger");
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -208,7 +209,13 @@ module.exports = async (req, res) => {
           }
 
         } catch (bridgeError) {
-          console.error("[deposit/detect] Bridge error:", bridgeError);
+          logError(bridgeError, {
+            operation: 'bridge_simulation',
+            deposit_id: deposit.id,
+            user_id: wallet.user_id,
+            ton_tx_hash: deposit.ton_tx_hash
+          });
+          
           await supabase
             .from("ton_deposits")
             .update({

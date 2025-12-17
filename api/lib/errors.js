@@ -53,27 +53,11 @@ const ERROR_CODES = {
 };
 
 /**
- * Log error with context
+ * Log error with context (uses logger module)
  */
 function logError(error, context = {}) {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    error: {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      name: error.name
-    },
-    context: context
-  };
-
-  // In production, send to error tracking service (Sentry, etc.)
-  console.error('[ERROR]', JSON.stringify(logEntry, null, 2));
-
-  // TODO: Send to error tracking service
-  // if (process.env.SENTRY_DSN) {
-  //   Sentry.captureException(error, { extra: context });
-  // }
+  const { logError: loggerError } = require('./logger');
+  return loggerError(error.message || 'Unknown error', error, context);
 }
 
 /**

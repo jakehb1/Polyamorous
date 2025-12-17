@@ -5,6 +5,7 @@
 const { validateSession } = require("./middleware/validate-session");
 const { checkIdempotency, storeIdempotencyKey, checkRateLimit, hashRequest } = require("./lib/security");
 const { handleApiError, validateAmount, ERROR_CODES } = require("./lib/errors");
+const { logError, logTransaction, logSecurityEvent } = require("./lib/logger");
 const { createClient } = require("@supabase/supabase-js");
 
 module.exports = async (req, res) => {
@@ -215,8 +216,24 @@ module.exports = async (req, res) => {
         },
         trade_id: tradeId
       });
+      
+      // Log transaction
+      logTransaction('trade_executed', {
+        user_id: userId,
+        trade_id: tradeId,
+        market_id: marketId,
+        side: side.toLowerCase(),
+        amount: tradeAmount,
+        shares: shares,
+        price: mockPrice,
+        ledger_entry_id: ledgerEntryId
+      });
     } catch (ledgerError) {
-      console.error("[trade] Ledger entry creation failed:", ledgerError);
+      logError(ledgerError, {
+        operation: 'ledger_entry_creation',
+        user_id: userId,
+        trade_id: tradeId
+      });
       // Continue even if ledger fails
     }
 
