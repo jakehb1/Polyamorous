@@ -1173,6 +1173,33 @@ module.exports = async (req, res) => {
                 const eventSlug = (event.slug || "").toLowerCase();
                 const eventText = `${eventTitle} ${eventSlug}`.toLowerCase();
                 
+                // EXCLUDE: Esports and other sports (Counter-Strike, NBA, etc.)
+                const isEsports = eventText.includes('counter-strike') || 
+                                 eventText.includes('cs:') ||
+                                 eventText.includes('cs2') ||
+                                 eventText.includes('esports') ||
+                                 eventText.includes('dota') ||
+                                 eventText.includes('league of legends') ||
+                                 eventText.includes('lol') ||
+                                 eventText.includes('valorant') ||
+                                 eventText.includes('rocket league');
+                const isOtherSport = eventText.includes('nba') || 
+                                    eventText.includes('mlb') || 
+                                    eventText.includes('nhl') ||
+                                    eventText.includes('soccer') ||
+                                    eventText.includes('basketball') ||
+                                    eventText.includes('baseball') ||
+                                    eventText.includes('hockey') ||
+                                    eventText.includes('tennis') ||
+                                    eventText.includes('golf') ||
+                                    eventText.includes('ufc') ||
+                                    eventText.includes('boxing');
+                
+                if (isEsports || isOtherSport) {
+                  console.log("[markets] Excluding non-NFL sport event:", event.title, "isEsports:", isEsports, "isOtherSport:", isOtherSport);
+                  continue;
+                }
+                
                 // Exclude college/NCAA football explicitly - be very aggressive
                 // Check for NCAA, college football, college team indicators
                 const collegeIndicators = [
