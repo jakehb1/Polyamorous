@@ -1219,7 +1219,8 @@ module.exports = async (req, res) => {
                   continue;
                 }
                 
-                // Must have at least one NFL team keyword to be included
+                // CRITICAL: Must have at least TWO NFL team keywords (a matchup requires two teams)
+                // This ensures we're only getting actual NFL game matchups, not other content
                 const nflTeamKeywords = [
                   'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
                   'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
@@ -1229,14 +1230,34 @@ module.exports = async (req, res) => {
                   'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
                   'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
                   'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
+                  // Team abbreviations (use word boundaries to avoid false matches)
                   'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
                   'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
                 ];
-                const hasNflTeam = nflTeamKeywords.some(team => eventText.includes(team.toLowerCase()));
-                if (!hasNflTeam) {
-                  console.log("[markets] No NFL team found in event:", event.title);
-                  continue; // Skip if no NFL team keywords found
+                
+                // Count how many NFL teams are mentioned
+                const teamMatches = nflTeamKeywords.filter(team => {
+                  // For short abbreviations, use word boundaries
+                  if (team.length <= 3) {
+                    const regex = new RegExp(`\\b${team}\\b`, 'i');
+                    return regex.test(eventText);
+                  }
+                  return eventText.includes(team);
+                });
+                
+                // Require at least 2 different NFL teams (a game matchup)
+                // OR at least 1 team + "nfl" keyword + week indicator
+                const hasMultipleTeams = teamMatches.length >= 2;
+                const hasNflKeyword = eventText.includes('nfl') || eventText.includes('national football league');
+                const hasWeekIndicator = eventText.includes('week') || extractWeekNumber(eventTitle) !== null || extractWeekNumber(eventSlug) !== null;
+                const hasSingleTeamWithContext = teamMatches.length >= 1 && hasNflKeyword && hasWeekIndicator;
+                
+                if (!hasMultipleTeams && !hasSingleTeamWithContext) {
+                  console.log("[markets] No NFL team matchup found in event:", event.title, "teamMatches:", teamMatches.length);
+                  continue; // Skip if no NFL team matchup found
                 }
+                
+                console.log("[markets] NFL matchup found:", event.title, "teams:", teamMatches.length, "team names:", teamMatches.slice(0, 2));
                 
                 // Extract and filter by week
                 const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug);
