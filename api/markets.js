@@ -1029,16 +1029,31 @@ module.exports = async (req, res) => {
               const sportsResp = await fetch(`${GAMMA_API}/sports`);
               if (sportsResp.ok) {
                 const sportsData = await sportsResp.json();
-                // Find NFL in sports data
+                // Find NFL in sports data - try multiple field names
                 if (Array.isArray(sportsData)) {
                   const nflSport = sportsData.find(s => 
                     (s.slug || '').toLowerCase() === 'nfl' ||
                     (s.label || '').toLowerCase() === 'nfl' ||
-                    (s.name || '').toLowerCase() === 'nfl'
+                    (s.name || '').toLowerCase() === 'nfl' ||
+                    (s.sport || '').toLowerCase() === 'nfl'
                   );
-                  if (nflSport && nflSport.tagId) {
-                    nflTagIds = [nflSport.tagId];
-                    console.log("[markets] Found NFL tag ID from /sports:", nflSport.tagId);
+                  if (nflSport) {
+                    // Try multiple possible field names for tag ID
+                    const tagId = nflSport.tagId || nflSport.tag_id || nflSport.id;
+                    if (tagId) {
+                      nflTagIds = [tagId];
+                      console.log("[markets] Found NFL tag ID from /sports:", tagId);
+                    } else {
+                      // Check if tags field exists (might be array or comma-separated string)
+                      if (nflSport.tags) {
+                        if (Array.isArray(nflSport.tags)) {
+                          nflTagIds = nflSport.tags;
+                        } else if (typeof nflSport.tags === 'string') {
+                          nflTagIds = nflSport.tags.split(',').map(id => id.trim()).filter(id => id);
+                        }
+                        console.log("[markets] Found NFL tag IDs from /sports.tags:", nflTagIds);
+                      }
+                    }
                   }
                 }
               }
@@ -1047,13 +1062,11 @@ module.exports = async (req, res) => {
             }
           }
           
-          // CRITICAL: If still no NFL tag ID, we cannot proceed - do not use Sports tag 1
+          // If still no NFL tag ID, try using Sports tag (1) but with strict NFL filtering
+          // This is a fallback - ideally we'd use the NFL-specific tag
           if (nflTagIds.length === 0) {
-            console.log("[markets] ERROR: No NFL tag ID found. Cannot fetch NFL games without NFL subcategory tag.");
-            return res.status(200).json({
-              markets: [],
-              meta: { total: 0, message: "NFL subcategory tag not found. Please ensure NFL tag exists in Polymarket API." }
-            });
+            console.log("[markets] WARNING: No NFL-specific tag ID found. Using Sports tag (1) with strict NFL filtering.");
+            nflTagIds = [1]; // Use Sports tag as fallback, but we'll filter strictly for NFL
           }
           
           console.log("[markets] Using NFL tag IDs for filtering:", nflTagIds);
@@ -1912,8 +1925,8 @@ module.exports = async (req, res) => {
 
     // Filter: must meet minimum volume threshold (only if minVolumeNum > 0)
     // Don't filter by volume by default - match Polymarket's behavior of showing all active markets
+    const beforeVolumeFilter = markets.length; // Define outside if block so it's available for logging
     if (minVolumeNum > 0) {
-      const beforeVolumeFilter = markets.length;
       markets = markets.filter(m => {
         const volume24hr = parseFloat(m.volume24hr) || 0;
         const volume = parseFloat(m.volume) || 0;
