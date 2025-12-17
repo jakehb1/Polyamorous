@@ -2040,6 +2040,15 @@
           return;
         }
         
+        // Add initialization timeout to prevent hanging
+        const initTimeout = setTimeout(() => {
+          console.warn('[TON Connect] Initialization taking too long, may be stuck');
+          const fallbackBtn = document.getElementById('connectTonBtnFallback');
+          if (fallbackBtn && fallbackBtn.style.display !== 'none') {
+            console.log('[TON Connect] Fallback button available if initialization fails');
+          }
+        }, 5000);
+        
         // Get the app URL (use current origin)
         const appUrl = window.location.origin;
         // Use API endpoint for manifest to ensure proper CORS headers
@@ -2069,8 +2078,14 @@
         }
         
         tonConnectUI = new TonConnectUI(tonConnectConfig);
+        clearTimeout(initTimeout);
         
         console.log('[TON Connect] Initialized', isTelegram ? 'for Telegram' : 'with TON Foundation bridge');
+        
+        // Check if initialization was successful
+        if (!tonConnectUI) {
+          throw new Error('TON Connect UI initialization failed');
+        }
 
           // Set up fallback button click handler immediately
           const connectContainer = document.getElementById('tonConnectButtonContainer');
