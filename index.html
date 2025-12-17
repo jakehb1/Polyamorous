@@ -3254,8 +3254,11 @@
           const outcome1Color = getOutcomeColor(moneylineMarket, outcome1, 0) || team1Color;
           const outcome2Color = getOutcomeColor(moneylineMarket, outcome2, 1) || team2Color;
           
+          // Store event data in a data attribute for easier access
+          const eventDataStr = encodeURIComponent(JSON.stringify(event));
+          
           return `
-            <div class="event-group" data-event-id="${event.eventId}" style="cursor: pointer;" onclick="openGameDetail('${event.eventId}', ${JSON.stringify(event).replace(/"/g, '&quot;')})">
+            <div class="event-group" data-event-id="${event.eventId}" data-event-data="${eventDataStr}" style="cursor: pointer;">
               <div class="event-header" style="padding: 16px; border-bottom: 1px solid var(--border);">
                 ${eventDateTime ? `<div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">${eventDateTime}</div>` : ''}
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -3281,7 +3284,7 @@
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--text-muted);">
                   <span>${formatVolume(eventVol)} Vol.</span>
-                  <button style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; cursor: pointer;" onclick="event.stopPropagation(); openGameDetail('${event.eventId}', ${JSON.stringify(event).replace(/"/g, '&quot;')})">Game View →</button>
+                  <button class="game-view-btn" data-event-id="${event.eventId}" style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; cursor: pointer;">Game View →</button>
                 </div>
               </div>
             </div>
