@@ -6,8 +6,9 @@
   <title>Polygram · Trade Predictions</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@2.3.1/dist/tonconnect-ui.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     @font-face {
       font-family: 'Benzin';
@@ -19,26 +20,26 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     :root {
-      --bg: #FFFFFF;
-      --card: #f8f9fa;
-      --text: #1a1a1a;
-      --text-muted: #6b7280;
-      --accent: #000000;
+      --bg: #EAF5FB;
+      --card: #d8edf8;
+      --text: #687E90;
+      --text-muted: #8a9ba8;
+      --accent: #687E90;
       --accent-light: #4B4B4B;
       --accent-pink: #4B4B4B;
-      --green: #000000;
-      --green-soft: #1a1a1a;
+      --green: #4B4B4B;
+      --green-soft: #6b6b6b;
       --red: #d97777;
-      --border: #e5e7eb;
-      --bg-secondary: #f3f4f6;
-      --card-hover: #e5e7eb;
+      --border: #c5d9e8;
+      --bg-secondary: #e0f0f8;
+      --card-hover: #c8e0f0;
       --radius: 24px;
       --radius-sm: 16px;
       --shadow: none;
     }
 
     body {
-      font-family: 'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -50,7 +51,7 @@
     .splash-screen {
       position: fixed;
       inset: 0;
-      background: linear-gradient(135deg, #fff5f0 0%, #fef3f2 25%, #f5f0ff 50%, #f0f4ff 75%, #ffffff 100%);
+      background: var(--bg);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -70,18 +71,18 @@
       font-size: 32px;
     }
     .splash-logo-text {
-      font-family: 'Inter', 'Montserrat', sans-serif;
+      font-family: 'Montserrat', sans-serif;
       font-size: 42px;
-      font-weight: 900;
-      color: #000000;
-      letter-spacing: -0.03em;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
     }
     
     .splash-spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid rgba(0, 0, 0, 0.1);
-      border-top-color: #000000;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
@@ -213,7 +214,7 @@
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
-      background: #000000;
+      background: var(--accent);
       color: white;
       border: none;
       border-radius: var(--radius-sm);
@@ -247,16 +248,9 @@
     .header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 10px;
       margin-bottom: 20px;
       padding: 8px 0;
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
     }
     .header-logo {
       display: flex;
@@ -272,34 +266,6 @@
       font-weight: 800;
       color: var(--text);
       letter-spacing: -0.02em;
-    }
-    .platform-selector {
-      display: flex;
-      gap: 4px;
-      background: var(--bg);
-      border-radius: 20px;
-      padding: 4px;
-      border: 1px solid var(--border);
-    }
-    .platform-btn {
-      padding: 6px 12px;
-      border-radius: 16px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: inherit;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-    .platform-btn:hover {
-      color: var(--text);
-    }
-    .platform-btn.active {
-      background: var(--accent);
-      color: white;
     }
 
     /* Cards */
@@ -762,8 +728,8 @@
       transform: scale(0.95);
     }
     .category-chip.active {
-      background: #000000;
-      color: white;
+      background: var(--green);
+      color: var(--text);
     }
     
     /* Legacy mode-chips (keeping for backward compatibility) */
@@ -986,12 +952,13 @@
       opacity: 0.8;
     }
     .event-price-btn-1 {
-      background: var(--market-color, #003366);
+      background: var(--accent);
       color: white;
     }
     .event-price-btn-2 {
-      background: var(--market-color, #003366);
-      color: white;
+      background: var(--bg-secondary);
+      color: var(--text);
+      border: 1px solid var(--border);
     }
     .event-markets {
       padding: 0;
@@ -1131,20 +1098,20 @@
       transform: scale(0.95);
     }
     .outcome-yes {
-      background: var(--market-color, #003366);
+      background: var(--accent-pink);
       color: white;
-      border-color: var(--market-color, #003366);
+      border-color: var(--accent-pink);
     }
     .outcome-yes:active {
       opacity: 0.9;
     }
     .outcome-no {
-      background: var(--market-color, #003366);
-      color: white;
-      border-color: var(--market-color, #003366);
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--border);
     }
     .outcome-no:active {
-      opacity: 0.9;
+      background: var(--card);
     }
     .market-card-footer {
       display: flex;
@@ -1263,23 +1230,12 @@
       cursor: pointer;
       border: none;
       transition: all 0.2s;
-      background: var(--market-color, #003366);
-      color: white;
+      background: var(--bg);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     .trade-outcome.active { 
-      background: #000000;
-      color: white;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .trade-outcome .trade-outcome-label,
-    .trade-outcome .trade-outcome-percent,
-    .trade-outcome .trade-outcome-price {
-      color: white;
-    }
-    .trade-outcome.active .trade-outcome-label,
-    .trade-outcome.active .trade-outcome-percent {
-      color: white;
+      background: var(--green-soft);
+      box-shadow: 0 2px 6px rgba(75, 75, 75, 0.2);
     }
     .trade-outcome-left {
       display: flex;
@@ -1303,9 +1259,12 @@
     .trade-outcome-price {
       font-size: 18px;
       font-weight: 700;
-      color: white;
+      color: var(--green);
       min-width: 60px;
       text-align: right;
+    }
+    .trade-outcome.active .trade-outcome-price {
+      color: var(--accent);
     }
     
     .trade-amount {
@@ -1356,7 +1315,7 @@
       font-size: 16px;
       font-weight: 600;
       font-family: inherit;
-      background: #000000;
+      background: var(--accent);
       color: white;
       border: none;
       border-radius: 30px;
@@ -1535,9 +1494,9 @@
       border-color: var(--accent);
     }
     .time-selector.active {
-      background: #000000;
-      color: white;
-      border-color: #000000;
+      background: var(--accent);
+      color: #EAF5FB;
+      border-color: var(--accent);
     }
     .market-detail-selected-outcome {
       display: flex;
@@ -1591,12 +1550,13 @@
       transform: scale(0.98);
     }
     .buy-btn-yes {
-      background: #10b981; /* Green for Yes */
+      background: var(--green);
       color: white;
     }
     .buy-btn-no {
-      background: #ef4444; /* Red for No */
-      color: white;
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
     }
     .buy-btn-label {
       font-size: 11px;
@@ -1689,15 +1649,9 @@
   <div class="app-shell" id="appShell">
     <!-- Header -->
     <header class="header">
-      <div class="header-left">
-        <div class="header-logo">
-          <span class="header-logo-icon">✦</span>
-          <span class="header-logo-text">Polygram</span>
-        </div>
-      </div>
-      <div class="platform-selector">
-        <button class="platform-btn active" data-platform="polymarket" id="platformPolymarket">Polymarket</button>
-        <button class="platform-btn" data-platform="kalshi" id="platformKalshi">Kalshi</button>
+      <div class="header-logo">
+        <span class="header-logo-icon">✦</span>
+        <span class="header-logo-text">Polygram</span>
       </div>
     </header>
 
@@ -1741,6 +1695,25 @@
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
+            </button>
+          </div>
+        </div>
+        <div class="wallet-row">
+          <div class="wallet-label">
+            <span class="wallet-icon">💎</span>
+            <span>TON Wallet</span>
+          </div>
+          <div class="wallet-address-row">
+            <span class="wallet-address" id="tonWalletAddress" title="Click to copy">Not connected</span>
+            <button class="copy-btn" id="copyTonBtn" title="Copy TON address" style="display: none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <div id="tonConnectButtonContainer" style="margin-left: 8px;"></div>
+            <button class="wallet-action-btn" id="connectTonBtnFallback" title="Connect TON Wallet" style="margin-left: 8px; display: none;">
+              Connect
             </button>
           </div>
         </div>
@@ -1964,7 +1937,6 @@
       selectedMarket: null,
       selectedCategory: null,
       selectedSportType: null, // 'games' or 'props'
-      selectedPlatform: 'polymarket', // 'polymarket' or 'kalshi'
       tradeSide: 'yes',
       selectedOutcomeIndex: 0,
       selectedSubFilter: 'all',
@@ -2049,6 +2021,148 @@
     }
 
     // =====================
+    // TON CONNECT INITIALIZATION
+    // =====================
+    let tonConnectUI = null;
+
+    function initTONConnect() {
+      try {
+        if (typeof TonConnectUI !== 'undefined') {
+          // Get the app URL (use current origin)
+          const appUrl = window.location.origin;
+          const manifestUrl = `${appUrl}/tonconnect-manifest.json`;
+          
+          console.log('[TON Connect] Initializing with manifest:', manifestUrl);
+          
+          tonConnectUI = new TonConnectUI({
+            manifestUrl: manifestUrl,
+            buttonRootId: 'tonConnectButtonContainer',
+            language: 'en',
+            uiPreferences: {
+              theme: 'LIGHT',
+              borderRadius: 'm'
+            }
+          });
+
+          // Listen for wallet connection status changes
+          tonConnectUI.onStatusChange((walletInfo) => {
+            console.log('[TON Connect] Wallet status changed:', walletInfo);
+            
+            if (walletInfo) {
+              // Wallet connected
+              const tonAddress = walletInfo.account.address;
+              console.log('[TON Connect] Wallet connected:', tonAddress);
+              
+              // Update UI
+              const tonEl = document.getElementById('tonWalletAddress');
+              const tonCopyBtn = document.getElementById('copyTonBtn');
+              const connectContainer = document.getElementById('tonConnectButtonContainer');
+              
+              if (tonEl) tonEl.textContent = tonAddress;
+              if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
+              if (connectContainer) connectContainer.style.display = 'none';
+              
+              // Save TON address to backend
+              saveTONAddress(tonAddress);
+              
+              // Update state
+              if (state.wallet) {
+                state.wallet.ton = tonAddress;
+              }
+              
+              // Setup copy button
+              setupCopyButton('copyTonBtn', tonAddress);
+              setupClickableAddress('tonWalletAddress', tonAddress);
+              
+              hapticFeedback('success');
+            } else {
+              // Wallet disconnected
+              console.log('[TON Connect] Wallet disconnected');
+              
+              // Update UI
+              const tonEl = document.getElementById('tonWalletAddress');
+              const tonCopyBtn = document.getElementById('copyTonBtn');
+              const connectContainer = document.getElementById('tonConnectButtonContainer');
+              
+              if (tonEl) tonEl.textContent = 'Not connected';
+              if (tonCopyBtn) tonCopyBtn.style.display = 'none';
+              if (connectContainer) connectContainer.style.display = 'block';
+              
+              // Update state
+              if (state.wallet) {
+                state.wallet.ton = null;
+              }
+            }
+          });
+
+          // Check if wallet is already connected
+          const walletInfo = tonConnectUI.wallet;
+          if (walletInfo) {
+            console.log('[TON Connect] Wallet already connected:', walletInfo.account.address);
+            const tonAddress = walletInfo.account.address;
+            
+            // Update UI
+            const tonEl = document.getElementById('tonWalletAddress');
+            const tonCopyBtn = document.getElementById('copyTonBtn');
+            const connectContainer = document.getElementById('tonConnectButtonContainer');
+            
+            if (tonEl) tonEl.textContent = tonAddress;
+            if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
+            if (connectContainer) connectContainer.style.display = 'none';
+            
+            // Save to backend
+            saveTONAddress(tonAddress);
+            
+            // Update state
+            if (state.wallet) {
+              state.wallet.ton = tonAddress;
+            }
+            
+            setupCopyButton('copyTonBtn', tonAddress);
+            setupClickableAddress('tonWalletAddress', tonAddress);
+          }
+          
+          console.log('[TON Connect] Initialization complete');
+        } else {
+          console.warn('[TON Connect] TonConnectUI not available');
+        }
+      } catch (error) {
+        console.error('[TON Connect] Initialization error:', error);
+      }
+    }
+
+    async function saveTONAddress(tonAddress) {
+      try {
+        if (!state.telegramId) {
+          console.error('[TON Connect] Cannot save TON address: no Telegram ID');
+          return;
+        }
+
+        const resp = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: state.telegramId,
+            ton_address: tonAddress
+          })
+        });
+
+        if (!resp.ok) {
+          const errorData = await resp.json();
+          throw new Error(errorData.message || 'Failed to save TON address');
+        }
+
+        const data = await resp.json();
+        console.log('[TON Connect] TON address saved:', data);
+      } catch (error) {
+        console.error('[TON Connect] Error saving TON address:', error);
+        // Don't show error to user - address is still connected in TON Connect
+      }
+    }
+
+    // =====================
     // UTILS
     // =====================
     function shortAddr(addr) {
@@ -2065,303 +2179,6 @@
       if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
       if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
       return `$${num.toFixed(0)}`;
-    }
-
-    /**
-     * NFL Team Colors Mapping
-     * Primary colors for each NFL team
-     */
-    const NFL_TEAM_COLORS = {
-      // NFC
-      'rams': '#003594', // Rams Blue
-      'los angeles rams': '#003594',
-      'lar': '#003594',
-      'la': '#003594',
-      '49ers': '#AA0000', // 49ers Red
-      'san francisco 49ers': '#AA0000',
-      'sf': '#AA0000',
-      'cowboys': '#003594', // Cowboys Blue
-      'dallas cowboys': '#003594',
-      'dal': '#003594',
-      'packers': '#203731', // Packers Green
-      'green bay packers': '#203731',
-      'gb': '#203731',
-      'bears': '#0B162A', // Bears Navy
-      'chicago bears': '#0B162A',
-      'chi': '#0B162A',
-      'vikings': '#4F2683', // Vikings Purple
-      'minnesota vikings': '#4F2683',
-      'min': '#4F2683',
-      'lions': '#0076B6', // Lions Blue
-      'detroit lions': '#0076B6',
-      'det': '#0076B6',
-      'saints': '#D3BC8D', // Saints Gold
-      'new orleans saints': '#D3BC8D',
-      'no': '#D3BC8D',
-      'falcons': '#A71930', // Falcons Red
-      'atlanta falcons': '#A71930',
-      'atl': '#A71930',
-      'panthers': '#0085CA', // Panthers Blue
-      'carolina panthers': '#0085CA',
-      'car': '#0085CA',
-      'buccaneers': '#D50A0A', // Bucs Red
-      'tampa bay buccaneers': '#D50A0A',
-      'tb': '#D50A0A',
-      'cardinals': '#97233F', // Cardinals Red
-      'arizona cardinals': '#97233F',
-      'ari': '#97233F',
-      'seahawks': '#002244', // Seahawks Blue
-      'seattle seahawks': '#002244',
-      'sea': '#002244',
-      'commanders': '#5A1414', // Commanders Burgundy
-      'washington commanders': '#5A1414',
-      'was': '#5A1414',
-      'wsh': '#5A1414',
-      'giants': '#0B2265', // Giants Blue
-      'new york giants': '#0B2265',
-      'nyg': '#0B2265',
-      'eagles': '#004C54', // Eagles Green
-      'philadelphia eagles': '#004C54',
-      'phi': '#004C54',
-      
-      // AFC
-      'broncos': '#FB4F14', // Broncos Orange
-      'denver broncos': '#FB4F14',
-      'den': '#FB4F14',
-      'chiefs': '#E31837', // Chiefs Red
-      'kansas city chiefs': '#E31837',
-      'kc': '#E31837',
-      'raiders': '#000000', // Raiders Black
-      'las vegas raiders': '#000000',
-      'lv': '#000000',
-      'chargers': '#0080C6', // Chargers Blue
-      'los angeles chargers': '#0080C6',
-      'lac': '#0080C6',
-      'patriots': '#002244', // Patriots Blue
-      'new england patriots': '#002244',
-      'ne': '#002244',
-      'jets': '#125740', // Jets Green
-      'new york jets': '#125740',
-      'nyj': '#125740',
-      'bills': '#00338D', // Bills Blue
-      'buffalo bills': '#00338D',
-      'buf': '#00338D',
-      'dolphins': '#008E97', // Dolphins Teal
-      'miami dolphins': '#008E97',
-      'mia': '#008E97',
-      'ravens': '#241773', // Ravens Purple
-      'baltimore ravens': '#241773',
-      'bal': '#241773',
-      'bengals': '#FB4F14', // Bengals Orange
-      'cincinnati bengals': '#FB4F14',
-      'cin': '#FB4F14',
-      'browns': '#311D00', // Browns Brown
-      'cleveland browns': '#311D00',
-      'cle': '#311D00',
-      'steelers': '#FFB612', // Steelers Gold
-      'pittsburgh steelers': '#FFB612',
-      'pit': '#FFB612',
-      'texans': '#03202F', // Texans Navy
-      'houston texans': '#03202F',
-      'hou': '#03202F',
-      'colts': '#002C5F', // Colts Blue
-      'indianapolis colts': '#002C5F',
-      'ind': '#002C5F',
-      'jaguars': '#006778', // Jaguars Teal
-      'jacksonville jaguars': '#006778',
-      'jax': '#006778',
-      'titans': '#0C2340', // Titans Navy
-      'tennessee titans': '#0C2340',
-      'ten': '#0C2340',
-    };
-
-    /**
-     * Extract team name from text (case-insensitive)
-     * Checks for team names/abbreviations using word boundaries to avoid partial matches
-     */
-    function extractTeamName(text) {
-      if (!text) return null;
-      const lowerText = text.toLowerCase().trim();
-      
-      // Sort team names by length (longest first) to match full names before abbreviations
-      const teamEntries = Object.entries(NFL_TEAM_COLORS).sort((a, b) => b[0].length - a[0].length);
-      
-      // Check for exact team name matches (with word boundaries for abbreviations)
-      for (const [teamName, color] of teamEntries) {
-        // For short abbreviations (2-3 chars), use word boundary matching
-        if (teamName.length <= 3) {
-          const regex = new RegExp(`\\b${teamName}\\b`, 'i');
-          if (regex.test(lowerText)) {
-            return teamName;
-          }
-        } else {
-          // For longer names, use substring matching
-          if (lowerText.includes(teamName)) {
-            return teamName;
-          }
-        }
-      }
-      
-      return null;
-    }
-
-    /**
-     * Get team color for an outcome
-     * Returns the team color if the outcome represents a team
-     * For non-team markets with Yes/No outcomes, uses Polymarket pattern (green for Yes, red for No)
-     * Otherwise generates a color based on market
-     */
-    // Extract team abbreviation from team name
-    function extractTeamAbbreviation(teamName) {
-      if (!teamName) return '';
-      const name = teamName.toLowerCase().trim();
-      
-      // Map of team names to abbreviations
-      const teamAbbrs = {
-        'bills': 'BUF', 'buffalo bills': 'BUF', 'buffalo': 'BUF',
-        'dolphins': 'MIA', 'miami dolphins': 'MIA', 'miami': 'MIA',
-        'patriots': 'NE', 'new england patriots': 'NE', 'new england': 'NE',
-        'jets': 'NYJ', 'new york jets': 'NYJ',
-        'ravens': 'BAL', 'baltimore ravens': 'BAL', 'baltimore': 'BAL',
-        'bengals': 'CIN', 'cincinnati bengals': 'CIN', 'cincinnati': 'CIN',
-        'browns': 'CLE', 'cleveland browns': 'CLE', 'cleveland': 'CLE',
-        'steelers': 'PIT', 'pittsburgh steelers': 'PIT', 'pittsburgh': 'PIT',
-        'texans': 'HOU', 'houston texans': 'HOU', 'houston': 'HOU',
-        'colts': 'IND', 'indianapolis colts': 'IND', 'indianapolis': 'IND',
-        'jaguars': 'JAX', 'jacksonville jaguars': 'JAX', 'jacksonville': 'JAX',
-        'titans': 'TEN', 'tennessee titans': 'TEN', 'tennessee': 'TEN',
-        'broncos': 'DEN', 'denver broncos': 'DEN', 'denver': 'DEN',
-        'chiefs': 'KC', 'kansas city chiefs': 'KC', 'kansas city': 'KC',
-        'raiders': 'LV', 'las vegas raiders': 'LV', 'oakland raiders': 'LV',
-        'chargers': 'LAC', 'los angeles chargers': 'LAC',
-        'cowboys': 'DAL', 'dallas cowboys': 'DAL', 'dallas': 'DAL',
-        'giants': 'NYG', 'new york giants': 'NYG',
-        'eagles': 'PHI', 'philadelphia eagles': 'PHI', 'philadelphia': 'PHI',
-        'commanders': 'WAS', 'washington commanders': 'WAS', 'washington': 'WAS', 'wsh': 'WAS',
-        'bears': 'CHI', 'chicago bears': 'CHI', 'chicago': 'CHI',
-        'lions': 'DET', 'detroit lions': 'DET', 'detroit': 'DET',
-        'packers': 'GB', 'green bay packers': 'GB', 'green bay': 'GB',
-        'vikings': 'MIN', 'minnesota vikings': 'MIN', 'minnesota': 'MIN',
-        'falcons': 'ATL', 'atlanta falcons': 'ATL', 'atlanta': 'ATL',
-        'panthers': 'CAR', 'carolina panthers': 'CAR', 'carolina': 'CAR',
-        'saints': 'NO', 'new orleans saints': 'NO', 'new orleans': 'NO',
-        'buccaneers': 'TB', 'tampa bay buccaneers': 'TB', 'tampa bay': 'TB',
-        'cardinals': 'ARI', 'arizona cardinals': 'ARI', 'arizona': 'ARI',
-        'rams': 'LAR', 'los angeles rams': 'LAR',
-        '49ers': 'SF', 'san francisco 49ers': 'SF', 'san francisco': 'SF',
-        'seahawks': 'SEA', 'seattle seahawks': 'SEA', 'seattle': 'SEA'
-      };
-      
-      // Check exact matches first
-      if (teamAbbrs[name]) return teamAbbrs[name];
-      
-      // Check partial matches
-      for (const [key, abbr] of Object.entries(teamAbbrs)) {
-        if (name.includes(key) || key.includes(name)) {
-          return abbr;
-        }
-      }
-      
-      // If no match, return first 3 uppercase letters
-      return teamName.substring(0, 3).toUpperCase();
-    }
-    
-    // Get team color from team name
-    function getTeamColor(teamName) {
-      if (!teamName) return null;
-      const name = teamName.toLowerCase().trim();
-      return NFL_TEAM_COLORS[name] || null;
-    }
-    
-    function getOutcomeColor(market, outcome, outcomeIndex) {
-      if (!market || !outcome) return '#003366'; // Default blue
-      
-      const outcomeLower = outcome.toLowerCase().trim();
-      const questionLower = (market.question || '').toLowerCase();
-      
-      // First, try to extract team name directly from the outcome text
-      let teamName = extractTeamName(outcomeLower);
-      if (teamName && NFL_TEAM_COLORS[teamName]) {
-        return NFL_TEAM_COLORS[teamName];
-      }
-      
-      // If not found in outcome, try the full market question + outcome context
-      const marketText = `${questionLower} ${outcomeLower}`;
-      teamName = extractTeamName(marketText);
-      if (teamName && NFL_TEAM_COLORS[teamName]) {
-        return NFL_TEAM_COLORS[teamName];
-      }
-      
-      // For markets with "vs" or team names in question, try to match outcome position
-      // If question has teams and outcomes are positional (first/second outcome = first/second team)
-      if (questionLower.includes(' vs ') || questionLower.includes(' vs. ')) {
-        const teamsInQuestion = [];
-        for (const [teamNameKey, color] of Object.entries(NFL_TEAM_COLORS)) {
-          if (questionLower.includes(teamNameKey)) {
-            teamsInQuestion.push({ name: teamNameKey, color });
-          }
-        }
-        // If we found teams and outcomes match positionally
-        if (teamsInQuestion.length >= 2 && outcomeIndex < teamsInQuestion.length) {
-          return teamsInQuestion[outcomeIndex].color;
-        } else if (teamsInQuestion.length === 1 && outcomeIndex === 0) {
-          // First outcome uses first team's color
-          return teamsInQuestion[0].color;
-        }
-      }
-      
-      // For non-team markets: use Polymarket pattern - green for Yes, red for No
-      // Check for Yes/No BEFORE checking teams to avoid conflicts (but only if not a team matchup)
-      const isTeamMatchup = questionLower.includes(' vs ') || questionLower.includes(' vs. ') ||
-                            extractTeamName(questionLower) !== null;
-      
-      if (!isTeamMatchup) {
-        if (outcomeLower === 'yes' || outcomeLower === 'y') {
-          return '#10B981'; // Green (similar to Polymarket's Yes button color)
-        }
-        if (outcomeLower === 'no' || outcomeLower === 'n') {
-          return '#EF4444'; // Red (similar to Polymarket's No button color)
-        }
-      }
-      
-      // Fallback: generate color based on market for consistency
-      const seed = `${market.id || market.conditionId || market.question || 'default'}_${outcomeIndex}`;
-      let hash = 0;
-      for (let i = 0; i < seed.length; i++) {
-        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      
-      const hue = 200 + (Math.abs(hash) % 40);
-      const saturation = 60 + (Math.abs(hash) % 25);
-      const lightness = 35 + (Math.abs(hash) % 15);
-      
-      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-    }
-
-    /**
-     * Generate a deterministic color for a market based on market data
-     * Returns a blue-ish color (matching Polymarket's pattern)
-     * Uses market ID or question to ensure consistent colors
-     */
-    function getMarketColor(market) {
-      if (!market) return '#003366'; // Default blue
-      
-      // Use market ID or question to generate consistent color
-      const seed = market.id || market.conditionId || market.question || 'default';
-      
-      // Simple hash function to convert seed to number
-      let hash = 0;
-      for (let i = 0; i < seed.length; i++) {
-        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      
-      // Generate blue color palette (similar to Polymarket's blue theme)
-      // Use different shades of blue based on hash
-      const hue = 200 + (hash % 40); // Blue range: 200-240
-      const saturation = 60 + (hash % 25); // 60-85%
-      const lightness = 35 + (hash % 15); // 35-50% (darker blues)
-      
-      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
     }
 
     // =====================
@@ -2539,13 +2356,14 @@
         const wallet = {
           solana: data.wallet.solana,
           polygon: data.wallet.polygon,
+          ton: data.wallet.ton || null,
           userId: data.wallet.userId,
           createdAt: data.wallet.createdAt
         };
         
         state.wallet = wallet;
         
-        console.log('Wallet loaded:', wallet.polygon, wallet.solana, data.isNew ? '(new)' : '(existing)');
+        console.log('Wallet loaded:', wallet.polygon, wallet.solana, wallet.ton || 'TON not connected', data.isNew ? '(new)' : '(existing)');
         
         // Display SOL wallet
         const solEl = document.getElementById('solWalletAddress');
@@ -2554,6 +2372,24 @@
         // Display USDC wallet (Polygon)
         const usdcEl = document.getElementById('usdcWalletAddress');
         if (usdcEl) usdcEl.textContent = wallet.polygon;
+        
+        // Display TON wallet
+        const tonEl = document.getElementById('tonWalletAddress');
+        const tonCopyBtn = document.getElementById('copyTonBtn');
+        const connectTonBtn = document.getElementById('connectTonBtn');
+        if (tonEl) {
+          if (wallet.ton) {
+            tonEl.textContent = wallet.ton;
+            if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
+            if (connectTonBtn) connectTonBtn.style.display = 'none';
+            setupCopyButton('copyTonBtn', wallet.ton);
+            setupClickableAddress('tonWalletAddress', wallet.ton);
+          } else {
+            tonEl.textContent = 'Not connected';
+            if (tonCopyBtn) tonCopyBtn.style.display = 'none';
+            if (connectTonBtn) connectTonBtn.style.display = 'inline-flex';
+          }
+        }
         
         // Update status
         const statusEl = document.getElementById('walletStatusBar');
@@ -2580,6 +2416,18 @@
         setupCopyButton('copyUsdcBtn', wallet.polygon);
         setupClickableAddress('solWalletAddress', wallet.solana);
         setupClickableAddress('usdcWalletAddress', wallet.polygon);
+        
+        // If TON address exists in wallet but not connected in TON Connect, show it
+        if (wallet.ton && tonConnectUI && !tonConnectUI.wallet) {
+          const tonEl = document.getElementById('tonWalletAddress');
+          const tonCopyBtn = document.getElementById('copyTonBtn');
+          const connectContainer = document.getElementById('tonConnectButtonContainer');
+          if (tonEl) tonEl.textContent = wallet.ton;
+          if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
+          if (connectContainer) connectContainer.style.display = 'none';
+          setupCopyButton('copyTonBtn', wallet.ton);
+          setupClickableAddress('tonWalletAddress', wallet.ton);
+        }
         
         // Load balance from Supabase and on-chain
         await loadBalance();
@@ -2828,16 +2676,9 @@
               // Scroll to active chip (center it if possible)
               chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
               
-              // If sports is clicked, go directly to NFL games
+              // If sports is clicked, show subcategories instead of markets
               if (kind === 'sports') {
-                state.selectedCategory = 'nfl';
-                state.selectedSportType = 'games';
-                // Hide sub-filters since we're going directly to NFL games
-                const subFiltersContainer = document.getElementById('subFiltersContainer');
-                if (subFiltersContainer) {
-                  subFiltersContainer.style.display = 'none';
-                }
-                fetchMarkets('nfl', 'games');
+                showSportsSubcategories();
               } else {
                 // Fetch markets for this category
                 fetchMarkets(kind);
@@ -2937,82 +2778,33 @@
     // =====================
     // MARKETS
     // =====================
-    // Get current NFL week (NFL season typically starts in early September)
-    function getCurrentNFLWeek() {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      
-      // NFL season typically starts first Thursday in September
-      // For 2025, the season starts on September 4, 2025 (Thursday, Week 1)
-      // Calculate season start for current year
-      let seasonStart = new Date(currentYear, 8, 1); // September 1st
-      // Find first Thursday in September
-      while (seasonStart.getDay() !== 4) { // 4 = Thursday
-        seasonStart.setDate(seasonStart.getDate() + 1);
-      }
-      
-      // If we're before the season start, use previous year's season
-      if (now < seasonStart) {
-        seasonStart = new Date(currentYear - 1, 8, 1);
-        while (seasonStart.getDay() !== 4) {
-          seasonStart.setDate(seasonStart.getDate() + 1);
-        }
-      }
-      
-      // Calculate days since season start
-      const daysDiff = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-      
-      // NFL weeks run Thursday to Wednesday, so calculate week number
-      const weekNum = Math.floor(daysDiff / 7) + 1;
-      
-      // Clamp to valid NFL weeks (1-18 for regular season, 19-22 for playoffs)
-      if (weekNum < 1) return 1;
-      if (weekNum > 22) return 18; // Regular season ends at week 18
-      
-      return weekNum;
-    }
-
     async function fetchMarkets(kind = 'trending', sportType = null) {
       const list = document.getElementById('marketsList');
       list.innerHTML = '<div class="loading">Loading markets...</div>';
 
       try {
-        console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType, 'platform:', state.selectedPlatform);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2588',message:'fetchMarkets called',data:{kind, sportType, selectedCategory: state.selectedCategory},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType);
         // Reduce limit for faster loading - 1000 markets is plenty for initial display
         // Only show markets with volume - filter out zero-volume markets (use $0.01 minimum)
-        // Don't filter by volume by default - show all active markets to match Polymarket
-        let apiUrl = `/api/markets?kind=${kind}&limit=1000&platform=${state.selectedPlatform || 'polymarket'}`;
+        let apiUrl = `/api/markets?kind=${kind}&limit=1000&minVolume=0.01`;
         if (sportType) {
           apiUrl += `&sportType=${sportType}`;
         }
-        // For NFL games, add current week parameter
-        if (kind.toLowerCase() === 'nfl' && sportType === 'games') {
-          const currentWeek = getCurrentNFLWeek();
-          if (currentWeek) {
-            apiUrl += `&week=${currentWeek}`;
-            console.log('[fetchMarkets] Filtering NFL games by week:', currentWeek);
-          }
-        }
         console.log('[fetchMarkets] URL:', apiUrl);
         
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2596',message:'API request URL',data:{apiUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const resp = await fetch(apiUrl);
         console.log('[fetchMarkets] Status:', resp.status, resp.statusText);
         
         if (!resp.ok) {
-          let errorData;
-          try {
-            errorData = await resp.json();
-          } catch (e) {
-            const errorText = await resp.text();
-            throw new Error(`HTTP ${resp.status}: ${errorText.substring(0, 100)}`);
-          }
-          
-          // Handle Kalshi authentication/configuration errors
-          if (resp.status === 503 && errorData.requiresAuth && state.selectedPlatform === 'kalshi') {
-            throw new Error('Kalshi API requires authentication. Please configure KALSHI_ACCESS_KEY and KALSHI_PRIVATE_KEY environment variables.');
-          }
-          
-          throw new Error(errorData.message || errorData.error || `HTTP ${resp.status}`);
+          const errorText = await resp.text();
+          console.error('[fetchMarkets] Error response:', errorText);
+          throw new Error(`HTTP ${resp.status}: ${errorText.substring(0, 100)}`);
         }
         
         const data = await resp.json();
@@ -3025,15 +2817,10 @@
         const markets = data.markets || [];
         
         if (markets.length > 0) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2617',message:'Markets before render',data:{marketCount: markets.length, sampleMarkets: markets.slice(0, 3).map(m => ({question: m.question, eventTitle: m.eventTitle, volume: m.volume24hr}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
           console.log('[fetchMarkets] First market:', markets[0]);
-          console.log('[fetchMarkets] Sample market structure:', {
-            hasEventId: !!markets[0]?.eventId,
-            hasEventTitle: !!markets[0]?.eventTitle,
-            question: markets[0]?.question,
-            eventTitle: markets[0]?.eventTitle,
-            outcomes: markets[0]?.outcomes,
-            outcomePrices: markets[0]?.outcomePrices
-          });
           state.markets = markets;
           renderMarkets(markets);
         } else {
@@ -3041,6 +2828,9 @@
           list.innerHTML = `<div class="loading">No markets found. <br><small style="color:var(--text-muted)">API responded but returned 0 markets</small></div>`;
         }
       } catch (err) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2625',message:'fetchMarkets error',data:{error: err.message, stack: err.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         console.error('[fetchMarkets] Error:', err);
         list.innerHTML = `
           <div class="loading" style="color:#d97777;">
@@ -3051,30 +2841,12 @@
       }
     }
 
-    // Format volume for display (e.g., 416000 -> "$416k")
-    function formatVolume(volume) {
-      const vol = parseFloat(volume) || 0;
-      if (vol >= 1000000) {
-        return '$' + (vol / 1000000).toFixed(vol >= 10000000 ? 0 : 1) + 'm';
-      } else if (vol >= 1000) {
-        return '$' + (vol / 1000).toFixed(vol >= 10000 ? 0 : 1) + 'k';
-      } else {
-        return '$' + vol.toFixed(0);
-      }
-    }
-
     function renderMarkets(markets) {
       const list = document.getElementById('marketsList');
-      
-      console.log('[renderMarkets] Rendering', markets.length, 'markets');
-      console.log('[renderMarkets] selectedCategory:', state.selectedCategory);
-      console.log('[renderMarkets] Markets with event data:', markets.filter(m => m.eventId && m.eventTitle).length);
       
       // Check if we should group by events (for NFL games)
       const shouldGroupByEvent = state.selectedCategory === 'nfl' && 
                                   markets.some(m => m.eventId && m.eventTitle);
-      
-      console.log('[renderMarkets] shouldGroupByEvent:', shouldGroupByEvent);
       
       if (shouldGroupByEvent && markets.length > 0) {
         // Group markets by event
@@ -3096,208 +2868,101 @@
           eventsMap.get(eventId).markets.push(m);
         });
         
-        // Calculate total volume for each event (use event volume if available, otherwise sum all market volumes)
-        let eventsWithVolume = Array.from(eventsMap.values()).map(event => {
-          // Use eventVolume if available (this is the total volume from Polymarket API)
-          // Otherwise, sum all market volumes (use volume, not volume24hr, for total event volume)
-          let totalVol = 0;
-          if (event.eventVolume && parseFloat(event.eventVolume) > 0) {
-            totalVol = parseFloat(event.eventVolume);
-          } else {
-            // Sum all market volumes (use total volume, not 24hr volume, for aggregate)
-            totalVol = event.markets.reduce((sum, m) => {
-              const vol = parseFloat(m.volume) || parseFloat(m.volume24hr) || 0;
-              return sum + vol;
-            }, 0);
-          }
-          return { ...event, totalVolume: totalVol };
+        // Sort events by volume (highest first) before rendering
+        const sortedEvents = Array.from(eventsMap.values()).sort((a, b) => {
+          const volA = a.eventVolume || a.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
+          const volB = b.eventVolume || b.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
+          return volB - volA;
         });
         
-        // Group events by date (like Polymarket does)
-        // Use event.startDate from API directly - it's the actual game date
-        const eventsByDate = new Map();
-        eventsWithVolume.forEach(event => {
-          let dateKey = 'Unknown Date';
-          let eventDate = null;
-          
-          // Try to get date from eventStartDate (from API)
-          if (event.eventStartDate) {
-            eventDate = new Date(event.eventStartDate);
-            // Check if date is valid
-            if (!isNaN(eventDate.getTime())) {
-              // Format as "Thu, December 18" or "Sat, December 20"
-              const options = { weekday: 'short', month: 'long', day: 'numeric' };
-              dateKey = eventDate.toLocaleDateString('en-US', options);
-            }
-          }
-          
-          // If no valid date, try to extract from event title (e.g., "Week 13 - Thursday, December 5")
-          if (!eventDate || isNaN(eventDate.getTime())) {
-            const title = event.eventTitle || '';
-            // Look for date patterns in title
-            const dateMatch = title.match(/(\w+day),\s*(\w+)\s+(\d+)/i);
-            if (dateMatch) {
-              const [, dayName, monthName, dayNum] = dateMatch;
-              const monthMap = {
-                'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
-                'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
-              };
-              const month = monthMap[monthName.toLowerCase()];
-              if (month !== undefined) {
-                const currentYear = new Date().getFullYear();
-                eventDate = new Date(currentYear, month, parseInt(dayNum));
-                if (!isNaN(eventDate.getTime())) {
-                  const options = { weekday: 'short', month: 'long', day: 'numeric' };
-                  dateKey = eventDate.toLocaleDateString('en-US', options);
-                }
-              }
-            }
-          }
-          
-          // Fallback: use current date if no date found
-          if (!eventDate || isNaN(eventDate.getTime())) {
-            eventDate = new Date(0); // Put events without dates at the end
-            dateKey = 'Unknown Date';
-          }
-          
-          // Store date object for sorting
-          event._dateObj = eventDate;
-          
-          if (!eventsByDate.has(dateKey)) {
-            eventsByDate.set(dateKey, []);
-          }
-          eventsByDate.get(dateKey).push(event);
-        });
-        
-        // Sort dates chronologically (earliest first)
-        const sortedDateKeys = Array.from(eventsByDate.keys()).sort((a, b) => {
-          const dateA = eventsByDate.get(a)[0]._dateObj;
-          const dateB = eventsByDate.get(b)[0]._dateObj;
-          return dateA - dateB;
-        });
-        
-        // Sort events within each date by volume (highest first)
-        sortedDateKeys.forEach(dateKey => {
-          eventsByDate.get(dateKey).sort((a, b) => b.totalVolume - a.totalVolume);
-        });
-        
-        // Render events grouped by date
-        list.innerHTML = sortedDateKeys.map(dateKey => {
-          const eventsForDate = eventsByDate.get(dateKey);
-          
-          return `
-            <div class="date-group" style="margin-bottom: 24px;">
-              <div class="date-header" style="font-size: 14px; font-weight: 600; color: var(--text-muted); padding: 8px 16px; border-bottom: 1px solid var(--border); margin-bottom: 0;">
-                ${dateKey}
-              </div>
-              ${eventsForDate.map(event => {
-          const eventVol = event.totalVolume;
+        // Render events with their markets
+        list.innerHTML = sortedEvents.map(event => {
+          const eventVol = event.eventVolume || 
+                          event.markets.reduce((sum, m) => sum + (m.volume24hr || m.volume || 0), 0);
           const eventImg = event.eventImage || event.markets[0]?.image || '';
           const hasImage = eventImg && eventImg.trim() !== '';
           
-          // Parse teams from event title (e.g., "Eagles vs Commanders" or "PHI vs WSH")
-          const eventTitle = event.eventTitle || '';
-          const teamMatch = eventTitle.match(/(.+?)\s+(?:vs|v\.?|@)\s+(.+)/i);
-          let team1 = '', team2 = '';
-          if (teamMatch) {
-            team1 = teamMatch[1].trim();
-            team2 = teamMatch[2].trim();
-          } else {
-            // Fallback: try to split by common separators
-            const parts = eventTitle.split(/[\s\-]+/);
-            if (parts.length >= 2) {
-              team1 = parts[0];
-              team2 = parts[parts.length - 1];
-            }
-          }
-          
-          // Get team abbreviations and colors
-          const team1Abbr = extractTeamAbbreviation(team1);
-          const team2Abbr = extractTeamAbbreviation(team2);
-          const team1Color = getTeamColor(team1) || '#003366';
-          const team2Color = getTeamColor(team2) || '#003366';
-          
-          // Format event date/time
-          let eventDateTime = '';
-          if (event.eventStartDate) {
-            const eventDate = new Date(event.eventStartDate);
-            if (!isNaN(eventDate.getTime())) {
-              const options = { weekday: 'short', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' };
-              eventDateTime = eventDate.toLocaleDateString('en-US', options);
-            }
-          }
+          // Get week tag if available
+          const weekTag = event.markets[0]?.eventTags?.find(t => 
+            (typeof t === 'string' ? t : (t.slug || t.label || '')).toLowerCase().includes('week')
+          );
+          const weekLabel = weekTag ? (typeof weekTag === 'string' ? weekTag : (weekTag.label || weekTag.slug || '')) : '';
           
           // Find primary moneyline market (the main game outcome)
-          // API should only return moneyline markets now, but find it explicitly
           const moneylineMarket = event.markets.find(m => {
             const q = (m.question || '').toLowerCase();
-            return q.includes('moneyline') || q.includes(' ml ') || q.includes(' ml?') ||
-                   (q.includes(' vs ') && 
-                    !q.includes('spread') && 
-                    !q.includes('total') && 
-                    !q.includes('o/u') &&
-                    !q.includes('over/under') &&
-                    !q.includes('mvp') &&
-                    !q.includes('leader'));
+            return q.includes('moneyline') || q.includes('ml') || 
+                   (q.includes(' vs ') && !q.includes('spread') && !q.includes('total') && !q.includes('o/u'));
           }) || event.markets[0];
           
-          // Skip this event if no moneyline market found
-          if (!moneylineMarket || !moneylineMarket.outcomes || moneylineMarket.outcomes.length !== 2) {
-            console.log('[renderMarkets] Skipping event without valid moneyline market:', event.eventTitle);
-            return '';
-          }
-          
-          // Get primary prices for moneyline (exactly 2 outcomes - one per team)
-          const primaryPrices = moneylineMarket.outcomePrices || [];
-          const primaryOutcomes = moneylineMarket.outcomes || [];
+          // Get primary prices for moneyline (first two outcomes)
+          const primaryPrices = moneylineMarket?.outcomePrices || [];
+          const primaryOutcomes = moneylineMarket?.outcomes || [];
           const price1 = primaryPrices[0] !== undefined ? (parseFloat(primaryPrices[0]) * 100).toFixed(0) + '¢' : '--';
           const price2 = primaryPrices[1] !== undefined ? (parseFloat(primaryPrices[1]) * 100).toFixed(0) + '¢' : '--';
-          
-          // Match outcomes to teams - outcome1 should be team1, outcome2 should be team2
-          const outcome1 = primaryOutcomes[0] || team1 || 'Yes';
-          const outcome2 = primaryOutcomes[1] || team2 || 'No';
-          
-          // Use team colors directly for each outcome
-          // outcome1 color = team1 color, outcome2 color = team2 color
-          const outcome1Color = team1Color; // Always use team1 color for first outcome
-          const outcome2Color = team2Color; // Always use team2 color for second outcome
-          
-          // Store event data in a data attribute for easier access
-          const eventDataStr = encodeURIComponent(JSON.stringify(event));
+          const outcome1 = primaryOutcomes[0] || 'Yes';
+          const outcome2 = primaryOutcomes[1] || 'No';
           
           return `
-            <div class="event-group" data-event-id="${event.eventId}" data-event-data="${eventDataStr}" style="cursor: pointer;">
-              <div class="event-header" style="padding: 16px; border-bottom: 1px solid var(--border);">
-                ${eventDateTime ? `<div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">${eventDateTime}</div>` : ''}
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                  <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                    <div style="width: 48px; height: 48px; border-radius: 8px; background: ${team1Color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
-                      ${team1Abbr || team1.substring(0, 3).toUpperCase()}
-                    </div>
-                    <div style="flex: 1;">
-                      <div style="font-size: 16px; font-weight: 600; color: var(--text);">${team1 || outcome1}</div>
-                      <div style="font-size: 12px; color: var(--text-muted);">${price1}</div>
-                    </div>
+            <div class="event-group collapsed" data-event-id="${event.eventId}">
+              <div class="event-header collapsed" data-collapse-target="${event.eventId}">
+                ${hasImage ? `<img class="event-image" src="${eventImg}" alt="" onerror="this.classList.add('hidden')" />` : ''}
+                <div class="event-info">
+                  <div class="event-title">
+                    ${weekLabel ? `<span class="week-tag">${weekLabel}</span>` : ''}
+                    <span class="event-title-text">${event.eventTitle}</span>
                   </div>
-                  <div style="font-size: 14px; color: var(--text-muted); padding: 0 8px;">vs</div>
-                  <div style="display: flex; align-items: center; gap: 12px; flex: 1; flex-direction: row-reverse;">
-                    <div style="width: 48px; height: 48px; border-radius: 8px; background: ${team2Color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
-                      ${team2Abbr || team2.substring(0, 3).toUpperCase()}
-                    </div>
-                    <div style="flex: 1; text-align: right;">
-                      <div style="font-size: 16px; font-weight: 600; color: var(--text);">${team2 || outcome2}</div>
-                      <div style="font-size: 12px; color: var(--text-muted);">${price2}</div>
-                    </div>
+                  <div class="event-meta">
+                    <span>Vol: ${formatVolume(eventVol)}</span>
+                    <span>${event.markets.length} market${event.markets.length !== 1 ? 's' : ''}</span>
                   </div>
+
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--text-muted);">
-                  <span>${formatVolume(eventVol)} Vol.</span>
-                  <button class="game-view-btn" data-event-id="${event.eventId}" style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; cursor: pointer;">Game View →</button>
+                <div class="event-primary-prices">
+                  ${primaryPrices.length >= 2 ? `
+                    <button class="event-price-btn event-price-btn-1" 
+                            data-market-id="${moneylineMarket?.id}" 
+                            data-outcome-index="0">
+                      ${outcome1} ${price1}
+                    </button>
+                    <button class="event-price-btn event-price-btn-2" 
+                            data-market-id="${moneylineMarket?.id}" 
+                            data-outcome-index="1">
+                      ${outcome2} ${price2}
+                    </button>
+                  ` : ''}
                 </div>
+                <div class="event-collapse-icon">▼</div>
               </div>
-            </div>
-          `;
-              }).join('')}
+              <div class="event-markets" data-event-markets="${event.eventId}">
+                ${event.markets.map(m => {
+                  const prices = m.outcomePrices || [];
+                  const outcomes = m.outcomes || ["Yes", "No"];
+                  const vol = m.volume24hr || m.volume || 0;
+                  
+                  return `
+                    <div class="market-outcome-item" data-id="${m.id}" data-market-id="${m.id}" style="cursor: pointer;">
+                      <div class="outcome-label">${m.question}</div>
+                      <div class="outcome-buttons">
+                        ${outcomes.map((outcome, idx) => {
+                          const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
+                          const isYes = outcome.toLowerCase() === 'yes' || idx === 0;
+                          return `
+                            <div class="outcome-button-group">
+                              <span class="outcome-price">${price}</span>
+                              <button class="outcome-btn ${isYes ? 'outcome-yes' : 'outcome-no'}" 
+                                      data-market-id="${m.id}" 
+                                      data-outcome-index="${idx}">
+                                ${outcome}
+                              </button>
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
             </div>
           `;
         }).join('');
@@ -3310,11 +2975,8 @@
           const imgUrl = m.image || m.eventImage || m.icon || '';
           const hasImage = imgUrl && imgUrl.trim() !== '';
         
-        // Get market color for this market
-        const marketColor = getMarketColor(m);
-        
         return `
-            <div class="market-card" data-id="${m.id}" style="--market-color: ${marketColor};">
+            <div class="market-card" data-id="${m.id}">
               <div class="market-card-header">
                 ${hasImage ? `<img class="market-image" src="${imgUrl}" alt="" onerror="this.classList.add('hidden')" />` : ''}
                 <div class="market-title">${m.question}</div>
@@ -3322,14 +2984,13 @@
               <div class="market-outcomes">
                 ${outcomes.map((outcome, idx) => {
                   const price = prices[idx] !== undefined ? (parseFloat(prices[idx]) * 100).toFixed(0) + '¢' : '--';
-                  const outcomeColor = getOutcomeColor(m, outcome, idx);
+                  const isYes = outcome.toLowerCase() === 'yes' || idx === 0;
                   return `
                     <div class="outcome-button-group">
                       <span class="outcome-price">${price}</span>
-                      <button class="outcome-btn" 
+                      <button class="outcome-btn ${isYes ? 'outcome-yes' : 'outcome-no'}" 
                               data-market-id="${m.id}" 
-                              data-outcome-index="${idx}"
-                              style="background: ${outcomeColor}; color: white; border-color: ${outcomeColor};">
+                              data-outcome-index="${idx}">
                         ${outcome}
                       </button>
             </div>
@@ -3475,18 +3136,7 @@
       const outcomesList = document.getElementById('marketDetailOutcomesList');
       const outcomes = market.outcomes || ["Yes", "No"];
       const prices = market.outcomePrices || [];
-      
-      // Get market color for dynamic theming
-      const marketColor = getMarketColor(market);
-      const marketDetailView = document.getElementById('marketDetailView');
-      if (marketDetailView) {
-        marketDetailView.style.setProperty('--market-color', marketColor);
-      }
-      
-      // Use market color with variations for different outcomes
-      const baseColor = marketColor;
-      // Convert HSL to RGB for manipulation (simplified - using the market color directly)
-      const colors = [baseColor, baseColor]; // Use same color for now, can add variations later
+      const colors = ['blue', 'green', 'orange', 'red', 'purple', 'pink'];
       
       outcomesList.innerHTML = outcomes.map((outcome, index) => {
         const price = prices[index] !== undefined ? parseFloat(prices[index]) : 0.5;
@@ -3776,21 +3426,14 @@
       
       // Setup Yes button (first outcome)
       const buyYesBtn = document.getElementById('marketDetailBuyYes');
-      const yesIndex = 0;
-      const yesPrice = prices[yesIndex] !== undefined ? (parseFloat(prices[yesIndex]) * 100).toFixed(0) : '50';
-      const yesOutcome = outcomes[yesIndex] || 'Yes';
-      document.getElementById('buyYesOutcome').textContent = yesOutcome;
+      const yesPrice = prices[0] !== undefined ? (parseFloat(prices[0]) * 100).toFixed(0) : '50';
+      document.getElementById('buyYesOutcome').textContent = outcomes[0] || 'Yes';
       document.getElementById('buyYesPrice').textContent = `${yesPrice}¢`;
-      
-      // Apply team-specific color to Yes button
-      const yesColor = getOutcomeColor(market, yesOutcome, yesIndex);
-      buyYesBtn.style.background = yesColor;
-      buyYesBtn.style.borderColor = yesColor;
       
       buyYesBtn.addEventListener('click', () => {
         hapticFeedback('medium');
-        state.selectedOutcomeIndex = yesIndex;
-        state.tradeSide = yesOutcome;
+        state.selectedOutcomeIndex = 0;
+        state.tradeSide = outcomes[0] || 'Yes';
         closeMarketDetail();
         openTradeModal(market);
       });
@@ -3799,19 +3442,13 @@
       const buyNoBtn = document.getElementById('marketDetailBuyNo');
       const noIndex = outcomes.length > 1 ? 1 : 0;
       const noPrice = prices[noIndex] !== undefined ? (parseFloat(prices[noIndex]) * 100).toFixed(0) : '50';
-      const noOutcome = outcomes[noIndex] || 'No';
-      document.getElementById('buyNoOutcome').textContent = noOutcome;
+      document.getElementById('buyNoOutcome').textContent = outcomes[noIndex] || 'No';
       document.getElementById('buyNoPrice').textContent = `${noPrice}¢`;
-      
-      // Apply team-specific color to No button
-      const noColor = getOutcomeColor(market, noOutcome, noIndex);
-      buyNoBtn.style.background = noColor;
-      buyNoBtn.style.borderColor = noColor;
       
       buyNoBtn.addEventListener('click', () => {
         hapticFeedback('medium');
         state.selectedOutcomeIndex = noIndex;
-        state.tradeSide = noOutcome;
+        state.tradeSide = outcomes[noIndex] || 'No';
         closeMarketDetail();
         openTradeModal(market);
       });
@@ -3862,15 +3499,6 @@
         state.selectedOutcomeIndex = outcomeIndex;
       }
 
-      // Get market color (dynamic based on market data)
-      const marketColor = getMarketColor(market);
-      
-      // Apply market color to modal via CSS custom property
-      const tradeModal = document.getElementById('tradeModal');
-      if (tradeModal) {
-        tradeModal.style.setProperty('--market-color', marketColor);
-      }
-
       // Get all outcomes and prices
       const outcomes = market.outcomes || ["Yes", "No"];
       const prices = market.outcomePrices || [];
@@ -3888,24 +3516,17 @@
       
       // Render all outcomes with percentages
       const outcomesContainer = document.getElementById('tradeOutcomes');
-      const defaultIndex = outcomeIndex !== undefined ? outcomeIndex : 0;
       outcomesContainer.innerHTML = outcomes.map((outcome, index) => {
         // Use 0.5 as fallback to match updateTradeSummary logic
         const price = prices[index] ? parseFloat(prices[index]) : 0.5;
         const percent = (price * 100).toFixed(0);
         const priceCents = (price * 100).toFixed(0);
-        const isActive = index === defaultIndex;
-        
-        // Get team-specific color for this outcome
-        const outcomeColor = getOutcomeColor(market, outcome, index);
-        const buttonStyle = !isActive ? `style="background: ${outcomeColor}; color: white;"` : '';
+        const isActive = index === 0; // Default to first outcome
         
         return `
           <div class="trade-outcome ${isActive ? 'active' : ''}" 
                data-outcome-index="${index}" 
-               data-outcome="${outcome}"
-               data-outcome-color="${outcomeColor}"
-               ${buttonStyle}>
+               data-outcome="${outcome}">
             <div class="trade-outcome-left">
               <div class="trade-outcome-label">${outcome}</div>
               <div class="trade-outcome-percent">${percent}%</div>
@@ -3924,16 +3545,10 @@
       // Add click handlers for outcomes
       outcomesContainer.querySelectorAll('.trade-outcome').forEach(outcomeEl => {
         outcomeEl.addEventListener('click', () => {
-          // Remove active from all and restore team colors
-          outcomesContainer.querySelectorAll('.trade-outcome').forEach(o => {
-            o.classList.remove('active');
-            // Restore team-specific color from data attribute
-            const outcomeColor = o.dataset.outcomeColor || 'var(--market-color, #003366)';
-            o.style.background = outcomeColor;
-          });
-          // Add active to clicked (black background)
+          // Remove active from all
+          outcomesContainer.querySelectorAll('.trade-outcome').forEach(o => o.classList.remove('active'));
+          // Add active to clicked
           outcomeEl.classList.add('active');
-          outcomeEl.style.background = '#000000';
           
           state.selectedOutcomeIndex = parseInt(outcomeEl.dataset.outcomeIndex);
           state.tradeSide = outcomeEl.dataset.outcome;
@@ -4384,31 +3999,6 @@
       });
     }
 
-    function initPlatformSelector() {
-      // Handle platform selector clicks
-      document.querySelectorAll('.platform-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const platform = btn.dataset.platform;
-          if (platform === state.selectedPlatform) return; // Already selected
-          
-          hapticFeedback('light');
-          
-          // Update active state
-          document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          
-          // Update state
-          state.selectedPlatform = platform;
-          
-          console.log('[platform] Switched to:', platform);
-          
-          // Reload markets with new platform
-          // Keep current category/sportType selection
-          fetchMarkets(state.selectedCategory || 'trending', state.selectedSportType);
-        });
-      });
-    }
-
     function initFundModal() {
       // Close on backdrop click
       document.getElementById('fundModal').addEventListener('click', (e) => {
@@ -4460,7 +4050,7 @@
     async function bootstrapApp() {
       console.log('Bootstrapping app...');
       initTelegram();
-      initPlatformSelector();
+      initTONConnect(); // Initialize TON Connect
       initModeChips();
       initTradeModal();
       initFundModal();

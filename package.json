@@ -12,12 +12,13 @@
     "test:flows:prod": "TEST_URL=https://your-app.vercel.app node test-flows.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "@ethersproject/wallet": "^5.7.0",
-    "@ethersproject/providers": "^5.7.2",
-    "@ethersproject/contracts": "^5.7.0",
     "@ethersproject/constants": "^5.7.0",
+    "@ethersproject/contracts": "^5.7.0",
+    "@ethersproject/providers": "^5.7.2",
+    "@ethersproject/wallet": "^5.7.0",
     "@solana/web3.js": "^1.95.4",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tonconnect/ui": "^2.3.1",
     "ethers": "^5.7.2"
   },
   "engines": {

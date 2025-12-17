@@ -91,18 +91,54 @@ module.exports = async (req, res) => {
       // Check if wallet already exists for this Telegram user
       const { data: existingWallet, error: fetchError } = await supabase
         .from("custody_wallets")
-        .select("polygon_address, solana_address, created_at, user_id")
+        .select("polygon_address, solana_address, ton_address, created_at, user_id")
         .eq("user_id", normalizedUserId)
         .single();
 
       if (existingWallet && !fetchError) {
         console.log("[wallet] Found existing wallet for Telegram user:", normalizedUserId);
-        console.log("[wallet] Wallet addresses - Polygon:", existingWallet.polygon_address, "Solana:", existingWallet.solana_address);
+        console.log("[wallet] Wallet addresses - Polygon:", existingWallet.polygon_address, "Solana:", existingWallet.solana_address, "TON:", existingWallet.ton_address || "not connected");
+        
+        // Handle POST request to update TON address (when user connects via TON Connect)
+        if (req.method === "POST" && req.body?.ton_address) {
+          const tonAddress = req.body.ton_address.trim();
+          console.log("[wallet] Updating TON address for user:", normalizedUserId, "Address:", tonAddress);
+          
+          const { data: updatedWallet, error: updateError } = await supabase
+            .from("custody_wallets")
+            .update({ ton_address: tonAddress })
+            .eq("user_id", normalizedUserId)
+            .select("polygon_address, solana_address, ton_address, created_at, user_id")
+            .single();
+          
+          if (updateError) {
+            console.error("[wallet] Error updating TON address:", updateError);
+            return res.status(500).json({
+              error: "ton_address_update_failed",
+              message: updateError.message
+            });
+          }
+          
+          return res.status(200).json({
+            success: true,
+            wallet: {
+              solana: updatedWallet.solana_address,
+              polygon: updatedWallet.polygon_address,
+              ton: updatedWallet.ton_address,
+              userId: normalizedUserId,
+              createdAt: updatedWallet.created_at,
+            },
+            isNew: false,
+            tonAddressUpdated: true,
+          });
+        }
+        
         return res.status(200).json({
           success: true,
           wallet: {
             solana: existingWallet.solana_address,
             polygon: existingWallet.polygon_address,
+            ton: existingWallet.ton_address || null,
             userId: normalizedUserId,
             createdAt: existingWallet.created_at,
           },
@@ -155,6 +191,7 @@ module.exports = async (req, res) => {
       const solanaSecretEnc = encrypt(solanaSecretKey, encryptionKey);
 
       // Save to Supabase with Telegram user ID
+      // Note: TON address is set separately when user connects via TON Connect (not custodial)
       const { data: newWallet, error: insertError } = await supabase
         .from("custody_wallets")
         .insert({
@@ -163,10 +200,11 @@ module.exports = async (req, res) => {
           polygon_secret_enc: polygonSecretEnc,
           solana_address: solanaAddress,
           solana_secret_enc: solanaSecretEnc,
+          ton_address: null, // Will be set when user connects via TON Connect
           clob_registered: false,
           usdc_approved: false,
         })
-        .select("polygon_address, solana_address, created_at, user_id")
+        .select("polygon_address, solana_address, ton_address, created_at, user_id")
         .single();
 
       if (insertError) {
@@ -205,6 +243,7 @@ module.exports = async (req, res) => {
           usdc_available: 0,
           usdc_locked: 0,
           sol_balance: 0,
+          ton_balance: 0, // TON balance (will be updated via bridge transactions)
         }, {
           onConflict: 'user_id'
         });
@@ -222,6 +261,7 @@ module.exports = async (req, res) => {
         wallet: {
           solana: newWallet.solana_address,
           polygon: newWallet.polygon_address,
+          ton: newWallet.ton_address || null,
           userId: normalizedUserId,
           createdAt: newWallet.created_at,
         },

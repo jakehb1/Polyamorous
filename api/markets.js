@@ -2,9 +2,9 @@
 // Fetches markets from Supabase database (mimics Polymarket architecture)
 // Falls back to Polymarket Gamma API if database is not configured or empty
 
-// Simple in-memory cache with TTL (2 seconds for near real-time updates)
+// Simple in-memory cache with TTL (5 seconds for fast updates)
 const cache = new Map();
-const CACHE_TTL = 2000; // 2 seconds - reduced for more accurate/real-time data
+const CACHE_TTL = 5000; // 5 seconds
 
 // Category tag IDs (verified from Polymarket events)
 const CATEGORY_TAG_IDS = {
@@ -20,8 +20,8 @@ const CATEGORY_TAG_IDS = {
   'elections': 377,
 };
 
-function getCacheKey(kind, sportType, platform = 'polymarket') {
-  return `${platform}_${kind}_${sportType || 'all'}`;
+function getCacheKey(kind, sportType) {
+  return `${kind}_${sportType || 'all'}`;
 }
 
 function getCached(key) {
@@ -42,56 +42,6 @@ function setCache(key, data) {
   }
 }
 
-// Extract week number from text (e.g., "week 13", "week-13", "week13")
-function extractWeekNumber(text) {
-  if (!text) return null;
-  const textLower = String(text).toLowerCase();
-  // Match patterns like "week 13", "week-13", "week13", "w13"
-  const weekMatch = textLower.match(/\b(?:week[\s\-]?|w)(\d{1,2})\b/);
-  if (weekMatch && weekMatch[1]) {
-    const weekNum = parseInt(weekMatch[1], 10);
-    if (weekNum >= 1 && weekNum <= 18) { // NFL regular season is 18 weeks
-      return weekNum;
-    }
-  }
-  return null;
-}
-
-// Get current NFL week based on date
-// NFL season typically starts first Thursday in September
-function getCurrentNFLWeek() {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  
-  // NFL season typically starts first Thursday in September
-  // Calculate season start for current year
-  let seasonStart = new Date(currentYear, 8, 1); // September 1st
-  // Find first Thursday in September
-  while (seasonStart.getDay() !== 4) { // 4 = Thursday
-    seasonStart.setDate(seasonStart.getDate() + 1);
-  }
-  
-  // If we're before the season start, use previous year's season
-  if (now < seasonStart) {
-    seasonStart = new Date(currentYear - 1, 8, 1);
-    while (seasonStart.getDay() !== 4) {
-      seasonStart.setDate(seasonStart.getDate() + 1);
-    }
-  }
-  
-  // Calculate days since season start
-  const daysDiff = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-  
-  // NFL weeks run Thursday to Wednesday, so calculate week number
-  const weekNum = Math.floor(daysDiff / 7) + 1;
-  
-  // Clamp to valid NFL weeks (1-18 for regular season, 19-22 for playoffs)
-  if (weekNum < 1) return 1;
-  if (weekNum > 22) return 18; // Regular season ends at week 18
-  
-  return weekNum;
-}
-
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -100,55 +50,19 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
 
-  const { kind = "trending", limit = "1000", sportType = null, platform = "polymarket", week = null } = req.query;
-  
-  // Route to appropriate platform handler
-  const platformLower = (platform || "polymarket").toLowerCase();
-  
-  if (platformLower === "kalshi") {
-    // Handle Kalshi requests
-    try {
-      const { fetchKalshiMarkets } = require("./kalshi-markets");
-      const markets = await fetchKalshiMarkets({
-        kind,
-        limit: Math.min(Math.max(Number(limit) || 1000, 1), 10000),
-        sportType,
-      });
-      
-      return res.status(200).json({
-        markets: markets,
-        meta: { total: markets.length, kind, platform: "kalshi" },
-      });
-    } catch (error) {
-      console.error("[markets] Kalshi error:", error.message);
-      
-      // Return 503 (Service Unavailable) for configuration errors, 500 for API errors
-      const statusCode = error.message.includes("not configured") || error.message.includes("authentication failed") 
-        ? 503 
-        : 500;
-      
-      return res.status(statusCode).json({
-        error: "kalshi_fetch_failed",
-        message: error.message,
-        markets: [],
-        requiresAuth: true,
-      });
-    }
-  }
-  
-  // Default to Polymarket (existing logic continues below)
+  const { kind = "trending", limit = "1000", sportType = null } = req.query;
   // Allow much higher limits to get all markets (default 1000, max 10000)
   const limitNum = Math.min(Math.max(Number(limit) || 1000, 1), 10000);
-  // Parse minVolume - default to 0 (no filter) to match Polymarket's behavior
-  // Only filter if explicitly requested - Polymarket shows all active markets regardless of volume
+  // Parse minVolume - default to $0.01 to filter out zero-volume markets but allow very low volume
+  // This ensures we get live markets even if they have minimal volume
   const minVolumeProvided = req.query.minVolume !== undefined && req.query.minVolume !== null;
-  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0;
-  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0 : minVolumeParsed, 0);
+  const minVolumeParsed = minVolumeProvided ? Number(req.query.minVolume) : 0.01;
+  const minVolumeNum = Math.max(isNaN(minVolumeParsed) ? 0.01 : minVolumeParsed, 0);
   // sportType: "games" or "props" - used to filter sports markets
 
   // Check cache first (only for reasonable limits to avoid caching huge responses)
-  if (limitNum <= 1000 && platformLower === "polymarket") {
-    const cacheKey = getCacheKey(kind, sportType, platformLower);
+  if (limitNum <= 1000) {
+    const cacheKey = getCacheKey(kind, sportType);
     const cached = getCached(cacheKey);
     if (cached) {
       console.log("[markets] Returning cached data for:", cacheKey);
@@ -723,9 +637,8 @@ module.exports = async (req, res) => {
       }
       
       const isGamesOnly = sportType === "games";
-      const estimatedCurrentWeek = getCurrentNFLWeek();
       console.log("[markets] Fetching NFL games, sportType:", sportType, "gamesOnly:", isGamesOnly);
-      console.log("[markets] Current NFL week (estimated):", estimatedCurrentWeek);
+      console.log("[markets] Current NFL week (estimated):", currentWeek);
       
       // Map sport slugs to common variations for better matching
       const sportVariations = {
@@ -932,14 +845,10 @@ module.exports = async (req, res) => {
               }
             }
             console.log("[markets] Found", markets.length, "markets from events");
-            console.log("[markets] Checked", checkedCount, "events, matched", matchedCount, "NFL game events");
-          } else {
-            console.log("[markets] WARNING: No events returned from API queries");
           }
         }
       } catch (e) {
         console.log("[markets] Error fetching events:", e.message);
-        console.error("[markets] Error stack:", e.stack);
       }
       
       // Strategy 2: Get tag IDs from /sports endpoint (more reliable for NFL)
@@ -1001,74 +910,22 @@ module.exports = async (req, res) => {
         }
       }
       
-      // Strategy 3: For NFL games, query events with NFL tag and filter by week
-      // This is the ONLY path for NFL games - no fallback to all markets
-      if (kind.toLowerCase() === "nfl" && isGamesOnly && isSportsSubcategory) {
-        console.log("[markets] Entering NFL games-only path (no fallback to all markets)");
-        // Determine target week: use provided week parameter, or default to current week
-        const targetWeek = week ? parseInt(week, 10) : getCurrentNFLWeek();
+      // Strategy 3: For NFL games, use multiple approaches to find game markets
+      // Since tag-based queries return props, we need to search more broadly
+      if (kind.toLowerCase() === "nfl" && isGamesOnly) {
+        // Approach 0: Query by NFL series ID first (most direct) - now handled in parallel queries
         
-        console.log("[markets] Fetching NFL games for week:", targetWeek);
-        
+        // Approach 1: Search all events for NFL game events
+        // Following docs: /events endpoint is most efficient (events contain their markets)
+        // Use order=id&ascending=false to get newest events first
         try {
-          // Get NFL tag ID(s) - MUST use NFL-specific tag, not Sports tag 1
-          let nflTagIds = categoryTagIds.length > 0 ? categoryTagIds : [];
-          
-          // If we don't have NFL tag IDs yet, fetch from /sports endpoint
-          if (nflTagIds.length === 0) {
-            try {
-              const sportsResp = await fetch(`${GAMMA_API}/sports`);
-              if (sportsResp.ok) {
-                const sportsData = await sportsResp.json();
-                // Find NFL in sports data - try multiple field names
-                if (Array.isArray(sportsData)) {
-                  const nflSport = sportsData.find(s => 
-                    (s.slug || '').toLowerCase() === 'nfl' ||
-                    (s.label || '').toLowerCase() === 'nfl' ||
-                    (s.name || '').toLowerCase() === 'nfl' ||
-                    (s.sport || '').toLowerCase() === 'nfl'
-                  );
-                  if (nflSport) {
-                    // Try multiple possible field names for tag ID
-                    const tagId = nflSport.tagId || nflSport.tag_id || nflSport.id;
-                    if (tagId) {
-                      nflTagIds = [tagId];
-                      console.log("[markets] Found NFL tag ID from /sports:", tagId);
-                    } else {
-                      // Check if tags field exists (might be array or comma-separated string)
-                      if (nflSport.tags) {
-                        if (Array.isArray(nflSport.tags)) {
-                          nflTagIds = nflSport.tags;
-                        } else if (typeof nflSport.tags === 'string') {
-                          nflTagIds = nflSport.tags.split(',').map(id => id.trim()).filter(id => id);
-                        }
-                        console.log("[markets] Found NFL tag IDs from /sports.tags:", nflTagIds);
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              console.log("[markets] Error fetching /sports:", e.message);
-            }
-          }
-          
-          // If still no NFL tag ID, try using Sports tag (1) but with strict NFL filtering
-          // This is a fallback - ideally we'd use the NFL-specific tag
-          if (nflTagIds.length === 0) {
-            console.log("[markets] WARNING: No NFL-specific tag ID found. Using Sports tag (1) with strict NFL filtering.");
-            nflTagIds = [1]; // Use Sports tag as fallback, but we'll filter strictly for NFL
-          }
-          
-          console.log("[markets] Using NFL tag IDs for filtering:", nflTagIds);
-          
-          // Query events - the API may not support tag_id as query param, so fetch all and filter
-          // Try multiple approaches to get NFL events
+          // Try multiple event queries in parallel for faster loading - increase limits to get all games
           const eventQueries = [
-            // Try fetching all events and filter by tags (most reliable)
-            `${GAMMA_API}/events?closed=false&limit=1000`,
-            // Try with series parameter
-            `${GAMMA_API}/events?series=10187&closed=false&limit=500`,
+            `${GAMMA_API}/events?closed=false&order=id&ascending=false&limit=1000`,
+            `${GAMMA_API}/events?series=10187&closed=false&order=id&ascending=false&limit=1000`,
+            `${GAMMA_API}/events?tag_id=1&closed=false&order=id&ascending=false&limit=1000`,
+            `${GAMMA_API}/events?tag_id=450&closed=false&order=id&ascending=false&limit=1000`,
+            `${GAMMA_API}/events?tag_id=100639&closed=false&order=id&ascending=false&limit=1000`,
           ];
           
           // Fetch all queries in parallel
@@ -1077,79 +934,7 @@ module.exports = async (req, res) => {
               const eventResp = await fetch(eventUrl);
               if (eventResp.ok) {
                 const events = await eventResp.json();
-                const eventsArray = Array.isArray(events) ? events : [];
-                
-                // Filter events that have NFL tags OR are NFL events
-                if (nflTagIds.length > 0) {
-                  const filtered = eventsArray.filter(event => {
-                    const eventTags = event.tags || [];
-                    const hasNflTag = eventTags.some(tag => {
-                      const tagId = typeof tag === 'object' ? tag.id : tag;
-                      return nflTagIds.includes(Number(tagId));
-                    });
-                    
-                    // If tag is just "Sports" (1), also check if it's actually an NFL event
-                    // Sports tag includes ALL sports (NFL, NBA, esports, etc.), so we need strict filtering
-                    if (hasNflTag && nflTagIds.includes(1) && nflTagIds.length === 1) {
-                      // Additional check: verify it's NFL and not other sports
-                      const eventTitle = (event.title || "").toLowerCase();
-                      const eventSlug = (event.slug || "").toLowerCase();
-                      const eventText = `${eventTitle} ${eventSlug}`;
-                      
-                      // STRICT: Must explicitly mention NFL or have NFL team names
-                      const hasNflKeyword = eventText.includes('nfl') || 
-                                           eventText.includes('national football league');
-                      
-                      // Check for NFL team names (32 official teams)
-                      const nflTeamKeywords = [
-                        'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
-                        'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
-                        'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
-                        'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
-                        'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
-                        'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
-                        'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
-                        'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
-                        'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
-                        'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
-                      ];
-                      const hasNflTeam = nflTeamKeywords.some(team => eventText.includes(team));
-                      
-                      // EXCLUDE: Esports, other sports
-                      const isEsports = eventText.includes('counter-strike') || 
-                                       eventText.includes('cs:') ||
-                                       eventText.includes('cs2') ||
-                                       eventText.includes('esports') ||
-                                       eventText.includes('dota') ||
-                                       eventText.includes('league of legends') ||
-                                       eventText.includes('lol');
-                      const isOtherSport = eventText.includes('nba') || 
-                                          eventText.includes('mlb') || 
-                                          eventText.includes('nhl') ||
-                                          eventText.includes('soccer') ||
-                                          eventText.includes('basketball') ||
-                                          eventText.includes('baseball') ||
-                                          eventText.includes('hockey');
-                      
-                      // Only include if it has NFL keyword OR NFL team, AND not esports/other sports
-                      const isNfl = (hasNflKeyword || hasNflTeam) && !isEsports && !isOtherSport;
-                      
-                      if (!isNfl) {
-                        console.log("[markets] Excluding non-NFL event:", event.title, "hasNflKeyword:", hasNflKeyword, "hasNflTeam:", hasNflTeam, "isEsports:", isEsports);
-                      }
-                      
-                      return isNfl;
-                    }
-                    
-                    return hasNflTag;
-                  });
-                  console.log("[markets] Filtered", filtered.length, "NFL events from", eventsArray.length, "total events");
-                  return filtered;
-                }
-                
-                return eventsArray;
-              } else {
-                console.log("[markets] Events API returned status:", eventResp.status);
+                return Array.isArray(events) ? events : [];
               }
               return [];
             } catch (e) {
@@ -1173,316 +958,285 @@ module.exports = async (req, res) => {
             }
           }
           
-          console.log("[markets] Total events after merging:", allEvents.length);
-          
           if (Array.isArray(allEvents) && allEvents.length > 0) {
-              // Determine target week: use provided week parameter, or default to current week
-              const targetWeek = week ? parseInt(week, 10) : getCurrentNFLWeek();
+              // NFL team names for matching (including abbreviations)
+              const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
+                               'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
+                               'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
+                               'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
+                               'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
+                               'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
+                               'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
+                               'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
+                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                               // Team abbreviations
+                               'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                               'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                               'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
               
-              console.log("[markets] Found", allEvents.length, "events from NFL tag queries");
-              console.log("[markets] Filtering for week:", targetWeek, week ? "(specified)" : "(current)");
+              console.log("[markets] Searching", allEvents.length, "events for NFL games");
+              let checkedCount = 0;
+              let matchedCount = 0;
               
-              // Log sample events for debugging
-              console.log("[markets] Sample events:", allEvents.slice(0, 3).map(e => ({
-                id: e.id,
-                title: e.title?.substring(0, 50),
-                slug: e.slug?.substring(0, 50),
-                tags: e.tags?.map(t => typeof t === 'object' ? t.id : t),
-                marketsCount: e.markets?.length || 0,
-                startDate: e.startDate
-              })));
-              
-              if (allEvents.length === 0) {
-                console.log("[markets] WARNING: No NFL events found. Check if NFL tag ID is correct:", nflTagIds);
-              }
-              
-              let matchedEvents = 0;
-              let eventsSkippedNoMarkets = 0;
-              let eventsSkippedFilters = 0;
-              
-              console.log("[markets] Starting to process", allEvents.length, "NFL events for week", targetWeek);
-              
-              // Simple filtering: events already have NFL tag, so they're NFL events
-              // Just filter by week and exclude college/props
+              // Find events that look like NFL games
               for (const event of allEvents) {
-                if (!event.markets || !Array.isArray(event.markets) || event.markets.length === 0) {
-                  eventsSkippedNoMarkets++;
-                  continue;
-                }
+                if (!event.markets || !Array.isArray(event.markets)) continue;
                 
                 const eventTitle = (event.title || "").toLowerCase();
                 const eventSlug = (event.slug || "").toLowerCase();
-                const eventText = `${eventTitle} ${eventSlug}`.toLowerCase();
+                const eventTags = (event.tags || []).map(t => typeof t === 'string' ? t.toLowerCase() : (t.slug || t.label || "").toLowerCase());
                 
-                // EXCLUDE: Esports and other sports (Counter-Strike, NBA, etc.)
-                const isEsports = eventText.includes('counter-strike') || 
-                                 eventText.includes('cs:') ||
-                                 eventText.includes('cs2') ||
-                                 eventText.includes('esports') ||
-                                 eventText.includes('dota') ||
-                                 eventText.includes('league of legends') ||
-                                 eventText.includes('lol') ||
-                                 eventText.includes('valorant') ||
-                                 eventText.includes('rocket league');
-                const isOtherSport = eventText.includes('nba') || 
-                                    eventText.includes('mlb') || 
-                                    eventText.includes('nhl') ||
-                                    eventText.includes('soccer') ||
-                                    eventText.includes('basketball') ||
-                                    eventText.includes('baseball') ||
-                                    eventText.includes('hockey') ||
-                                    eventText.includes('tennis') ||
-                                    eventText.includes('golf') ||
-                                    eventText.includes('ufc') ||
-                                    eventText.includes('boxing');
-                
-                if (isEsports || isOtherSport) {
-                  console.log("[markets] Excluding non-NFL sport event:", event.title, "isEsports:", isEsports, "isOtherSport:", isOtherSport);
-                  continue;
-                }
-                
-                // Exclude college/NCAA football explicitly - be very aggressive
-                // Check for NCAA, college football, college team indicators
-                const collegeIndicators = [
-                  'ncaa', 'cfb', 'college football', 'college', 'espn college',
-                  'state bulldogs', 'state', 'university', 'uni', 'school',
-                  'south carolina state', 'jacksonville state', 'troy state',
-                  'aggies', 'crimson tide', 'sooners', 'longhorns', 'tigers',
-                  'wildcats', 'bulldogs', 'eagles', 'hawks', 'wolverines'
-                ];
-                const hasCollegeIndicator = collegeIndicators.some(indicator => 
-                  eventText.includes(indicator)
-                );
-                // Also check if it has "State" in team names (NFL teams don't have "State")
-                const hasStateInName = /\b\w+\s+state\b/i.test(eventTitle);
-                if (hasCollegeIndicator || hasStateInName) {
-                  console.log("[markets] Excluding college game:", event.title);
-                  continue;
-                }
-                
-                // CRITICAL: Must have at least TWO NFL team keywords (a matchup requires two teams)
-                // This ensures we're only getting actual NFL game matchups, not other content
-                const nflTeamKeywords = [
-                  'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
-                  'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
-                  'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
-                  'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
-                  'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
-                  'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
-                  'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
-                  'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
-                  // Team abbreviations (use word boundaries to avoid false matches)
-                  'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
-                  'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
-                ];
-                
-                // Count how many NFL teams are mentioned
-                const teamMatches = nflTeamKeywords.filter(team => {
-                  // For short abbreviations, use word boundaries
+                // Check if event is NFL-related
+                const hasNflTag = eventTags.some(t => t.includes('nfl'));
+                // Check if event title/slug contains NFL teams (use word boundaries to avoid false positives)
+                const hasNflTeam = nflTeams.some(team => {
+                  // For abbreviations, check for exact match or with word boundaries
                   if (team.length <= 3) {
-                    const regex = new RegExp(`\\b${team}\\b`, 'i');
-                    return regex.test(eventText);
+                    return new RegExp(`\\b${team}\\b`, 'i').test(eventTitle) || new RegExp(`\\b${team}\\b`, 'i').test(eventSlug);
                   }
-                  return eventText.includes(team);
+                  return eventTitle.includes(team) || eventSlug.includes(team);
                 });
                 
-                // Require at least 2 different NFL teams (a game matchup)
-                // OR at least 1 team + "nfl" keyword + week indicator
-                const hasMultipleTeams = teamMatches.length >= 2;
-                const hasNflKeyword = eventText.includes('nfl') || eventText.includes('national football league');
-                const hasWeekIndicator = eventText.includes('week') || extractWeekNumber(eventTitle) !== null || extractWeekNumber(eventSlug) !== null;
-                const hasSingleTeamWithContext = teamMatches.length >= 1 && hasNflKeyword && hasWeekIndicator;
-                
-                if (!hasMultipleTeams && !hasSingleTeamWithContext) {
-                  console.log("[markets] No NFL team matchup found in event:", event.title, "teamMatches:", teamMatches.length);
-                  continue; // Skip if no NFL team matchup found
-                }
-                
-                console.log("[markets] NFL matchup found:", event.title, "teams:", teamMatches.length, "team names:", teamMatches.slice(0, 2));
-                
-                // Extract and filter by week
-                const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug);
-                
-                // Filter by week: if we can extract week number, it must match target week
-                // But if we can't extract week, check if event date is within current week range
-                // TEMPORARILY: Make week filtering less strict for debugging - include events within 2 weeks of target
-                if (targetWeek !== null) {
-                  if (eventWeek !== null && Math.abs(eventWeek - targetWeek) > 2) {
-                    console.log("[markets] Skipping event - week mismatch:", event.title, "eventWeek:", eventWeek, "targetWeek:", targetWeek);
-                    eventsSkippedFilters++;
-                    continue; // Skip events more than 2 weeks away
-                  }
-                  
-                  // If no week info, check event date to determine if it's in the target week
-                  // NFL weeks typically run Thu-Sun, so calculate week date range
-                  if (eventWeek === null && event.startDate) {
-                    const eventDate = new Date(event.startDate);
-                    const now = new Date();
-                    const currentYear = now.getFullYear();
-                    
-                    // Calculate season start using the same logic as getCurrentNFLWeek
-                    let seasonStart = new Date(currentYear, 8, 1);
-                    while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
-                    if (now < seasonStart) {
-                      seasonStart = new Date(currentYear - 1, 8, 1);
-                      while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
+                // Check if markets contain NFL teams
+                const marketsHaveTeams = event.markets.some(m => {
+                  const q = (m.question || "").toLowerCase();
+                  const s = (m.slug || "").toLowerCase();
+                  return nflTeams.some(team => {
+                    if (team.length <= 3) {
+                      return new RegExp(`\\b${team}\\b`, 'i').test(q) || new RegExp(`\\b${team}\\b`, 'i').test(s);
                     }
-                    
-                    // Calculate target week date range (each week is 7 days, Thu-Wed)
-                    // Include a 2-week window for debugging
-                    const weekStart = new Date(seasonStart);
-                    weekStart.setDate(seasonStart.getDate() + (targetWeek - 1 - 2) * 7); // 2 weeks before
-                    const weekEnd = new Date(seasonStart);
-                    weekEnd.setDate(seasonStart.getDate() + (targetWeek + 2) * 7); // 2 weeks after
-                    
-                    // If event date is way outside the range, skip it
-                    if (eventDate < weekStart || eventDate >= weekEnd) {
-                      console.log("[markets] Skipping event - date outside range:", event.title, "eventDate:", eventDate.toISOString(), "range:", weekStart.toISOString(), "to", weekEnd.toISOString());
-                      eventsSkippedFilters++;
-                      continue;
-                    }
+                    return q.includes(team) || s.includes(team);
+                  });
+                });
+                
+                const hasWeek = eventTitle.includes('week') || eventSlug.includes('week') || eventTags.some(t => t.includes('week'));
+                const hasVs = eventTitle.includes(" vs ") || eventSlug.includes(" vs ") || eventTitle.includes(" v ");
+                
+                // Extract week number from event
+                const eventWeek = extractWeekNumber(eventTitle) || extractWeekNumber(eventSlug) ||
+                                 (eventTags.find(t => t.includes('week')) ? extractWeekNumber(eventTags.find(t => t.includes('week'))) : null);
+                
+                // Filter by current week - show all games for current week (less strict)
+                if (eventWeek !== null) {
+                  // Include if week matches current week or is within 2 weeks ahead
+                  if (eventWeek < currentWeek - 2 || eventWeek > currentWeek + 2) {
+                    continue; // Skip games from past weeks or too far in future
                   }
                 }
                 
-                // Exclude prop events (MVP, leaders, etc.)
-                if (eventTitle.includes("mvp") || eventTitle.includes("leader") || 
-                    (eventTitle.includes("champion") && !eventTitle.includes("week"))) {
-                  continue;
-                }
-                
-                // Exclude games that have already happened
-                // Only exclude if we have a startDate - if no date, include it (might be upcoming)
+                // Filter by event start date - only exclude games that are clearly in the past
                 if (event.startDate) {
                   const eventStart = new Date(event.startDate);
-                  const now = new Date();
-                  // If event start time is more than 3 hours in the past, exclude it
-                  // (games typically last ~3 hours, so 3 hours after start means game is likely over)
-                  const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-                  if (isNaN(eventStart.getTime())) {
-                    console.log("[markets] Invalid event startDate, including event:", event.title);
-                  } else if (eventStart < threeHoursAgo) {
-                    console.log("[markets] Excluding past game:", event.title, "started:", eventStart.toISOString());
+                  // Only skip games that started more than 48 hours ago (give buffer for recent games)
+                  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+                  if (eventStart < twoDaysAgo) {
                     continue; // Skip games that already happened
                   }
+                  // Don't filter future games - show all upcoming games
                 }
                 
-                matchedEvents++;
-                // Log event details including date for debugging
-                const eventDateStr = event.startDate ? new Date(event.startDate).toISOString() : 'no date';
-                console.log("[markets] Including NFL event:", event.title, "Week:", eventWeek || "unknown", "Date:", eventDateStr, "startDate:", event.startDate);
-                
-                // ONLY include moneyline markets (one per team) - filter out spreads, totals, props
-                // Each game should have exactly ONE moneyline market with 2 outcomes (one per team)
-                let marketsAddedFromEvent = 0;
-                for (const market of event.markets) {
-                  if (market.closed || market.active === false) {
-                    console.log("[markets] Skipping closed/inactive market:", market.question?.substring(0, 50));
-                    continue;
-                  }
-                  
-                  const question = (market.question || "").toLowerCase();
-                  const slug = (market.slug || "").toLowerCase();
-                  const marketText = `${question} ${slug}`;
-                  
-                  // Exclude all non-moneyline markets first
-                  const isSpread = question.includes('spread') || question.includes('point spread');
-                  const isTotal = question.includes('total') || question.includes('o/u') || question.includes('over/under');
-                  const isProp = question.includes('mvp') || 
-                                question.includes('leader') || 
-                                question.includes('rookie of the year') ||
-                                question.includes('offensive player') ||
-                                question.includes('defensive player') ||
-                                (question.includes('winner') && !question.includes(' vs ')) ||
-                                (question.includes('champion') && !question.includes(' vs '));
-                  
-                  if (isSpread || isTotal || isProp) {
-                    console.log("[markets] Skipping non-moneyline market (spread/total/prop):", question.substring(0, 60));
-                    continue;
-                  }
-                  
-                  // Include moneyline markets - be more permissive
-                  // Polymarket moneyline markets might be: "Team A vs Team B", "Team A moneyline", etc.
-                  const hasVs = question.includes(' vs ') || question.includes(' v. ') || question.includes(' @ ');
-                  const hasMoneyline = question.includes('moneyline') || question.includes(' ml ') || question.includes(' ml?') || slug.includes('moneyline');
-                  
-                  // If it has "vs" or "moneyline" and is not a spread/total/prop, include it
-                  const isMoneyline = hasVs || hasMoneyline;
-                  
-                  if (!isMoneyline) {
-                    console.log("[markets] Skipping market (no vs/moneyline indicator):", question.substring(0, 60));
-                    continue;
-                  }
-                  
-                  // Moneyline markets should have exactly 2 outcomes (one per team)
-                  const outcomes = market.outcomes || [];
-                  if (outcomes.length !== 2) {
-                    console.log("[markets] Skipping market with", outcomes.length, "outcomes (expected 2):", question.substring(0, 60), "outcomes:", outcomes);
-                    continue;
-                  }
-                  
-                  marketsAddedFromEvent++;
-                  
-                  const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
-                  if (!existing) {
-                    // CRITICAL: Preserve ALL market volume fields - these must come from market, not event
-                    // Market volumes are individual per market, event volumes are aggregate
-                    // Also ensure event.startDate is properly passed through
-                    markets.push({
-                      ...market, // Spread all market fields first
-                      // Explicitly preserve volume fields from market (handle different API field name variations)
-                      volume: market.volume !== undefined ? market.volume : (typeof market.volume === 'string' ? parseFloat(market.volume) || 0 : 0),
-                      volume24hr: market.volume24hr !== undefined ? market.volume24hr : (market.volume24h !== undefined ? market.volume24h : (typeof market.volume24hr === 'string' ? parseFloat(market.volume24hr) || 0 : 0)),
-                      volume1wk: market.volume1wk !== undefined ? market.volume1wk : (market.volume1w !== undefined ? market.volume1w : (typeof market.volume1wk === 'string' ? parseFloat(market.volume1wk) || 0 : 0)),
-                      liquidity: market.liquidity !== undefined ? market.liquidity : (typeof market.liquidity === 'string' ? parseFloat(market.liquidity) || 0 : 0),
-                      // Add event metadata (these are separate from market fields)
-                      eventId: event.id,
-                      eventTitle: event.title,
-                      eventSlug: event.slug,
-                      eventTicker: event.ticker,
-                      eventStartDate: event.startDate || event.start_date || null, // Try both field names
-                      eventEndDate: event.endDate || event.end_date || null,
-                      eventImage: event.image || event.icon,
-                      eventVolume: event.volume, // Event volume is aggregate - separate from market volume
-                      eventLiquidity: event.liquidity, // Event liquidity is aggregate - separate from market liquidity
-                      eventTags: event.tags || [],
-                    });
-                  }
-                }
-              }
-              console.log("[markets] Processing summary:");
-              console.log("[markets]   Total events:", allEvents.length);
-              console.log("[markets]   Skipped (no markets):", eventsSkippedNoMarkets);
-              console.log("[markets]   Skipped (filters):", eventsSkippedFilters);
-              console.log("[markets]   Matched events:", matchedEvents);
-              console.log("[markets]   Markets found:", markets.length);
-              console.log("[markets] Added NFL game markets from events search");
-              if (markets.length === 0 && matchedEvents > 0) {
-                console.log("[markets] WARNING: Found", matchedEvents, "NFL events but 0 markets. This suggests the market filtering is too strict.");
-                // Log sample event details
-                const sampleEvents = allEvents.slice(0, 3);
-                sampleEvents.forEach((e, idx) => {
-                  console.log(`[markets] Sample event ${idx + 1}:`, e.title);
-                  console.log(`[markets]   Markets count:`, e.markets?.length || 0);
-                  if (e.markets && e.markets.length > 0) {
-                    console.log(`[markets]   Sample market questions:`, e.markets.slice(0, 3).map(m => m.question?.substring(0, 80)));
-                  }
+                // Check if markets look like games
+                const hasGameMarkets = event.markets.some(m => {
+                  const q = (m.question || "").toLowerCase();
+                  return q.includes(" vs ") || q.includes("moneyline") || q.includes("spread") || (q.includes("total") && !q.includes("player"));
                 });
+                
+                // Include if it looks like an NFL game event
+                // Be more permissive - include if markets have teams OR event has teams/tags
+                if ((hasNflTag || hasNflTeam || marketsHaveTeams) && (hasWeek || hasVs || hasGameMarkets || event.markets.length >= 2)) {
+                  checkedCount++;
+                  // Exclude if it's clearly a prop event
+                  const isPropEvent = eventTitle.includes("mvp") || eventTitle.includes("leader") || 
+                                     (eventTitle.includes("champion") && !eventTitle.includes("week")) ||
+                                     (eventTitle.includes("super bowl") && !eventTitle.includes("week"));
+                  
+                  if (!isPropEvent) {
+                    matchedCount++;
+                    console.log("[markets] Found NFL game event:", eventTitle, "with", event.markets.length, "markets");
+                    // If this is a game event, include ALL markets that aren't clearly props
+                    // Markets might be structured as team names (e.g., "DAL", "DET", "Cowboys", "Lions")
+                    for (const market of event.markets) {
+                      if (!market.closed && market.active !== false) {
+                        const question = (market.question || "").toLowerCase();
+                        const slug = (market.slug || "").toLowerCase();
+                        
+                        // BLACKLIST: Only exclude clearly prop markets (be more permissive)
+                        const isDefinitelyProp = 
+                          question.includes("rookie of the year") ||
+                          question.includes("offensive rookie") ||
+                          question.includes("defensive rookie") ||
+                          question.includes("offensive player of the year") ||
+                          question.includes("defensive player of the year") ||
+                          (question.includes("mvp") && !question.includes("vs") && !question.includes("week")) ||
+                          (question.includes("leader") && !question.includes("vs") && !question.includes("week")) ||
+                          (question.includes("award") && !question.includes("vs")) ||
+                          (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
+                          (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+                          (slug.includes("prop") && (slug.includes("mvp") || slug.includes("leader") || slug.includes("rookie")));
+                        
+                        // Include all markets from game events except clearly props
+                        if (!isDefinitelyProp) {
+                          const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                          if (!existing) {
+                            markets.push({
+                              ...market,
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventSlug: event.slug,
+                              eventTicker: event.ticker,
+                              eventStartDate: event.startDate,
+                              eventEndDate: event.endDate,
+                              eventImage: event.image || event.icon,
+                              eventVolume: event.volume,
+                              eventLiquidity: event.liquidity,
+                              eventTags: event.tags || [],
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
-          } else {
-              console.log("[markets] WARNING: No events found from API queries");
-              console.log("[markets] Possible reasons:");
-              console.log("[markets] 1. API returned empty arrays");
-              console.log("[markets] 2. No events match the NFL tag filter (tag IDs:", nflTagIds, ")");
-              console.log("[markets] 3. The tag IDs we're using might be incorrect");
+              console.log("[markets] Checked", checkedCount, "potential game events, matched", matchedCount, "events, found", markets.length, "markets");
+              console.log("[markets] Added NFL game markets from events search");
           }
         } catch (e) {
           console.log("[markets] Error searching events for NFL games:", e.message);
-          console.error("[markets] Error stack:", e.stack);
         }
         
-        // NOTE: We ONLY use the /events endpoint for NFL games to ensure we get the correct data
-        // Do NOT query /markets directly as it pulls in non-NFL games (college football, etc.)
-        // The /events endpoint with NFL tag_id gives us the correct NFL games organized by week
+        // Approach 2: Query markets directly by NFL tag IDs (most direct)
+        try {
+          const nflTagIds = [1, 450, 100639];
+          console.log("[markets] Querying markets by NFL tag IDs:", nflTagIds);
+          for (const tagId of nflTagIds) {
+            const tagMarketsUrl = `${GAMMA_API}/markets?tag_id=${tagId}&closed=false&limit=2000`;
+            const tagMarketsResp = await fetch(tagMarketsUrl);
+            if (tagMarketsResp.ok) {
+              const tagMarkets = await tagMarketsResp.json();
+              if (Array.isArray(tagMarkets)) {
+                console.log("[markets] Found", tagMarkets.length, "markets with tag_id", tagId);
+                // Add all active markets - we'll filter props in the filtering step below
+                for (const market of tagMarkets) {
+                  if (!market.closed && market.active !== false) {
+                    const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                    if (!existing) {
+                      markets.push(market);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          console.log("[markets] Total markets from tag IDs:", markets.length);
+        } catch (e) {
+          console.log("[markets] Error fetching markets by tag IDs:", e.message);
+        }
+        
+        // Approach 3: Search all markets for game structure
+        try {
+          const url = `${GAMMA_API}/markets?closed=false&limit=10000`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data)) {
+              const allMarkets = data.filter(m => !m.closed && m.active !== false);
+              
+              // NFL team names (including abbreviations)
+              const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
+                               'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
+                               'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
+                               'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
+                               'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
+                               'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
+                               'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
+                               'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
+                               'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                               // Team abbreviations
+                               'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                               'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                               'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
+              
+              const gameMarkets = allMarkets.filter(m => {
+                const question = (m.question || "").toLowerCase();
+                const slug = (m.slug || "").toLowerCase();
+                
+                // WHITELIST: Must have game structure
+                const hasGameStructure = 
+                  question.includes(" vs ") ||
+                  question.includes(" v ") ||
+                  question.includes("moneyline") ||
+                  question.includes("ml") ||
+                  question.includes("spread") ||
+                  question.includes("total") ||
+                  question.includes("o/u") ||
+                  question.includes("over/under") ||
+                  question.includes("over ") ||
+                  question.includes("under ") ||
+                  slug.includes("moneyline") ||
+                  slug.includes("spread") ||
+                  slug.includes("total") ||
+                  slug.includes("o/u") ||
+                  slug.includes("over-under");
+                
+                // Must mention NFL teams
+                const teamCount = nflTeams.filter(team => question.includes(team) || slug.includes(team)).length;
+                const hasNflTeams = teamCount > 0;
+                
+                // BLACKLIST: Exclude all prop markets
+                const isWillQuestion = question.includes("will ");
+                const isPlayerProp = isWillQuestion && (
+                  question.includes("rookie of the year") ||
+                  question.includes("offensive rookie") ||
+                  question.includes("defensive rookie") ||
+                  question.includes("offensive player of the year") ||
+                  question.includes("defensive player of the year") ||
+                  question.includes("mvp") ||
+                  question.includes("leader") ||
+                  question.includes("award") ||
+                  question.includes("champion") ||
+                  question.includes("be the") ||
+                  question.includes("in 2025") ||
+                  question.includes("in 2026") ||
+                  question.includes("2025-2026") ||
+                  question.includes("2026-2027")
+                );
+                
+                const isProp = 
+                  isPlayerProp ||
+                  (!hasGameStructure && isWillQuestion) ||
+                  question.includes("rookie of the year") ||
+                  question.includes("offensive rookie") ||
+                  question.includes("defensive rookie") ||
+                  question.includes("offensive player of the year") ||
+                  question.includes("defensive player of the year") ||
+                  question.includes("mvp") ||
+                  question.includes("leader") ||
+                  question.includes("award") ||
+                  (question.includes("champion") && !question.includes("week") && !question.includes("vs")) ||
+                  (question.includes("super bowl") && !question.includes("week") && !question.includes("vs")) ||
+                  (question.includes("playoff") && !question.includes("week") && !question.includes("vs")) ||
+                  slug.includes("prop") ||
+                  slug.includes("rookie") ||
+                  slug.includes("mvp") ||
+                  slug.includes("leader");
+                
+                return hasGameStructure && hasNflTeams && !isProp;
+              });
+              
+              // Add game markets that aren't already included
+              for (const market of gameMarkets) {
+                const existing = markets.find(m => (m.id || m.conditionId) === (market.id || market.conditionId));
+                if (!existing) {
+                  markets.push(market);
+                }
+              }
+              console.log("[markets] Added", gameMarkets.length, "NFL game markets from direct market search");
+            }
+          }
+        } catch (e) {
+          console.log("[markets] Error searching markets for NFL games:", e.message);
+        }
       } else if (kind.toLowerCase() === "nfl" && !isGamesOnly) {
         // For props: fetch by tag IDs
         if (categoryTagIds.length > 0 || categoryTagId) {
@@ -1710,112 +1464,9 @@ module.exports = async (req, res) => {
     
     console.log("[markets] Total unique markets found:", markets.length);
 
-    // Filter: If sportType is "games" and NFL, only include NFL game markets
+    // Filter: If sportType is "games", only include markets that are part of events (actual games)
     // Exclude props, futures, and other non-game markets
-    // Also exclude other sports (only NFL games for now) - STRICT filtering
-    if (sportType === "games" && isSportsSubcategory && kind.toLowerCase() === "nfl") {
-      // First pass: Filter out non-NFL sports before other checks
-      const beforeSportFilter = markets.length;
-      // Official NFL teams only (32 teams)
-      // AFC East: Bills, Dolphins, Patriots, Jets
-      // AFC North: Ravens, Bengals, Browns, Steelers
-      // AFC South: Texans, Colts, Jaguars, Titans
-      // AFC West: Broncos, Chiefs, Raiders, Chargers
-      // NFC East: Cowboys, Giants, Eagles, Commanders
-      // NFC North: Bears, Lions, Packers, Vikings
-      // NFC South: Falcons, Panthers, Saints, Buccaneers
-      // NFC West: Cardinals, Rams, 49ers, Seahawks
-      const nflTeamKeywords = [
-        // AFC East
-        'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
-        // AFC North
-        'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
-        // AFC South
-        'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
-        // AFC West
-        'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
-        // NFC East
-        'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
-        // NFC North
-        'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
-        // NFC South
-        'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
-        // NFC West
-        'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
-        // Team abbreviations
-        'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
-        'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
-      ];
-      // Non-NFL sports and teams to exclude
-      // Include college teams, esports, soccer leagues, and other sports
-      const nonNflSports = [
-        // College Football - be very aggressive with detection
-        'college football', 'cfb', 'ncaa', 'ncaaf', 'espn college', 'college', 
-        'miami hurricanes', 'texas a&m', 'texas a and m', 'texas a&m aggies',
-        'troy', 'jacksonville state', 'washington state', 'utah state',
-        // Esports
-        'dota', 'dota 2', 'esports', 'team falcons', 'parivision',
-        // Soccer/Football leagues
-        'serie a', 'ac milan', 'hellas verona', 'premier league', 'la liga', 'bundesliga', 'soccer',
-        // Other sports
-        'nba', 'mlb', 'nhl', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket'
-      ];
-      
-      markets = markets.filter(m => {
-        const marketText = `${m.question || ''} ${m.slug || ''} ${m.eventTitle || ''}`.toLowerCase();
-        
-        // FIRST: Exclude esports (Counter-Strike, CS2, etc.) - these can have team names that match NFL teams
-        const isEsports = marketText.includes('counter-strike') || 
-                         marketText.includes('cs:') ||
-                         marketText.includes('cs2') ||
-                         marketText.includes('esports') ||
-                         marketText.includes('dota') ||
-                         marketText.includes('league of legends') ||
-                         marketText.includes('lol') ||
-                         marketText.includes('valorant') ||
-                         marketText.includes('rocket league');
-        if (isEsports) {
-          return false; // Strictly exclude esports - team names can overlap with NFL
-        }
-        
-        // Second: check for NCAA/college football explicitly - must exclude
-        const hasCollegeFootball = /ncaa|cfb|college\s+football|espn\s+college/.test(marketText);
-        if (hasCollegeFootball && !marketText.includes('nfl')) {
-          return false; // Strictly exclude college/NCAA markets
-        }
-        
-        // Then check for other non-NFL sports
-        const mentionsOtherSport = nonNflSports.some(sport => {
-          const sportLower = sport.toLowerCase();
-          // For short terms, use word boundaries to avoid false positives
-          if (sportLower.length <= 4) {
-            return new RegExp(`\\b${sportLower}\\b`, 'i').test(marketText);
-          }
-          return marketText.includes(sportLower);
-        });
-        if (mentionsOtherSport) {
-          return false; // Strictly exclude - don't allow any non-NFL sports
-        }
-        
-        // Must have NFL keyword OR multiple NFL teams (to avoid false matches with esports)
-        const hasNflKeyword = marketText.includes('nfl') || marketText.includes('national football league');
-        
-        // Count NFL teams mentioned (use word boundaries for abbreviations)
-        const teamMatches = nflTeamKeywords.filter(team => {
-          if (team.length <= 3) {
-            const regex = new RegExp(`\\b${team}\\b`, 'i');
-            return regex.test(marketText);
-          }
-          return marketText.includes(team);
-        });
-        
-        // Require NFL keyword OR at least 2 NFL teams (a matchup)
-        // This prevents false matches where esports teams share names with NFL teams
-        const hasNflIndicator = hasNflKeyword || teamMatches.length >= 2;
-        
-        return hasNflIndicator; // Only keep if it has strong NFL indicators
-      });
-      console.log("[markets] After sport filter (NFL only):", markets.length, "(removed", beforeSportFilter - markets.length, "non-NFL markets)");
+    if (sportType === "games" && isSportsSubcategory) {
       const beforeFilter = markets.length;
       markets = markets.filter(m => {
         const question = (m.question || "").toLowerCase();
@@ -1877,26 +1528,24 @@ module.exports = async (req, res) => {
       });
       console.log("[markets] After games-only filter:", markets.length, "(removed", beforeFilter - markets.length, "non-game markets)");
       
-      // Additional filter: Remove games that have already happened
+      // Additional filter: Remove outdated games (past week or too far in future)
       const beforeDateFilter = markets.length;
       markets = markets.filter(m => {
         // Check event start date if available
         if (m.eventStartDate) {
           const eventStart = new Date(m.eventStartDate);
-          const now = new Date();
-          // Only filter if date is valid
-          if (!isNaN(eventStart.getTime())) {
-            // Exclude games that started more than 3 hours ago (games typically last ~3 hours)
-            // This ensures we only show active/upcoming games, not past games
-            const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-            if (eventStart < threeHoursAgo) {
-              return false; // Skip games that already happened
-            }
+          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+          
+          // Skip games that already happened (more than 24 hours ago)
+          if (eventStart < oneDayAgo) {
+            return false;
           }
-          // If date is invalid or in the future, include the market
-          // Don't filter future games - show all upcoming games
+          // Skip games too far in the future (more than 2 weeks)
+          if (eventStart > twoWeeksFromNow) {
+            return false;
+          }
         }
-        // If no date, include the market (might be upcoming)
         
         // Check week number from event tags or title
         const eventTitle = (m.eventTitle || "").toLowerCase();
@@ -1917,10 +1566,10 @@ module.exports = async (req, res) => {
           }
         }
         
-        // If we have a week number, filter by current week (more permissive)
+        // If we have a week number, filter by current week (less strict)
         if (eventWeek !== null) {
-          // Include if week matches current week or is within 4 weeks ahead/behind (more permissive)
-          if (eventWeek < currentWeek - 4 || eventWeek > currentWeek + 4) {
+          // Include if week matches current week or is within 2 weeks ahead
+          if (eventWeek < currentWeek - 2 || eventWeek > currentWeek + 2) {
             return false; // Skip games from past weeks or too far in future
           }
         }
@@ -1950,25 +1599,21 @@ module.exports = async (req, res) => {
 
     console.log("[markets] After price filter:", markets.length);
 
-    // Filter: must meet minimum volume threshold (only if minVolumeNum > 0)
-    // Don't filter by volume by default - match Polymarket's behavior of showing all active markets
-    const beforeVolumeFilter = markets.length; // Define outside if block so it's available for logging
-    if (minVolumeNum > 0) {
-      markets = markets.filter(m => {
-        const volume24hr = parseFloat(m.volume24hr) || 0;
-        const volume = parseFloat(m.volume) || 0;
-        const totalVolume = Math.max(volume24hr, volume);
-        const passes = totalVolume >= minVolumeNum;
-        if (!passes && beforeVolumeFilter < 100) {
-          // Log sample of filtered markets for debugging when we have few markets
-          console.log("[markets] Filtered market:", m.question?.substring(0, 50), "volume:", totalVolume);
-        }
-        return passes;
-      });
-      console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "low-volume markets)");
-    } else {
-      console.log("[markets] No volume filter applied - showing all active markets (matching Polymarket behavior)");
-    }
+    // Filter: must meet minimum volume threshold - always filter out zero-volume markets
+    const beforeVolumeFilter = markets.length;
+    markets = markets.filter(m => {
+      const volume24hr = parseFloat(m.volume24hr) || 0;
+      const volume = parseFloat(m.volume) || 0;
+      const totalVolume = Math.max(volume24hr, volume);
+      // Always exclude zero-volume markets, and apply minVolume threshold if set
+      const passes = totalVolume > 0 && totalVolume >= minVolumeNum;
+      if (!passes && beforeVolumeFilter < 100) {
+        // Log sample of filtered markets for debugging when we have few markets
+        console.log("[markets] Filtered market:", m.question?.substring(0, 50), "volume:", totalVolume);
+      }
+      return passes;
+    });
+    console.log("[markets] After volume filter (min: $" + minVolumeNum + "):", markets.length, "(removed", beforeVolumeFilter - markets.length, "zero/low-volume markets)");
     
     // If we have very few markets after filtering, log details for debugging
     if (markets.length === 0 && beforeVolumeFilter > 0) {
@@ -1982,64 +1627,36 @@ module.exports = async (req, res) => {
       );
     }
 
-    // Sort markets to match Polymarket's behavior
-    // For "trending": Sort by volume24hr (24-hour volume indicates trending activity)
-    // For "volume": Sort by total volume (all-time volume)
-    // For "new": Sort by creation date (newest first)
-    // For categories: Sort by volume24hr (most active first)
-    if (kind === "volume") {
-      // Sort by total volume (all-time)
-      markets.sort((a, b) => {
-        const volA = parseFloat(a.volume) || parseFloat(a.volume24hr) || 0;
-        const volB = parseFloat(b.volume) || parseFloat(b.volume24hr) || 0;
-        return volB - volA;
-      });
-    } else if (kind === "new") {
-      // Sort by creation date (newest first)
+    // Sort by volume (highest first)
+    markets.sort((a, b) => {
+      const volA = parseFloat(a.volume24hr) || parseFloat(a.volume) || 0;
+      const volB = parseFloat(b.volume24hr) || parseFloat(b.volume) || 0;
+      return volB - volA;
+    });
+    
+    // For "new", re-sort by date
+    if (kind === "new") {
       markets.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.startDate || 0);
         const dateB = new Date(b.createdAt || b.startDate || 0);
         return dateB - dateA;
       });
-    } else {
-      // Default: Sort by volume24hr (trending/category views use 24hr volume)
-      markets.sort((a, b) => {
-        const volA = parseFloat(a.volume24hr) || parseFloat(a.volume) || 0;
-        const volB = parseFloat(b.volume24hr) || parseFloat(b.volume) || 0;
-        return volB - volA;
-      });
     }
     
     // Final filtering for NFL games: remove props, keep game markets
     if (kind.toLowerCase() === "nfl" && sportType === "games") {
-      // Official NFL teams only (32 teams) - full names and abbreviations
-      // AFC East: Bills, Dolphins, Patriots, Jets
-      // AFC North: Ravens, Bengals, Browns, Steelers
-      // AFC South: Texans, Colts, Jaguars, Titans
-      // AFC West: Broncos, Chiefs, Raiders, Chargers
-      // NFC East: Cowboys, Giants, Eagles, Commanders
-      // NFC North: Bears, Lions, Packers, Vikings
-      // NFC South: Falcons, Panthers, Saints, Buccaneers
-      // NFC West: Cardinals, Rams, 49ers, Seahawks
-      const nflTeams = [
-        // Team names
-        'bills', 'buffalo bills', 'dolphins', 'miami dolphins', 'patriots', 'new england patriots', 'jets', 'new york jets',
-        'ravens', 'baltimore ravens', 'bengals', 'cincinnati bengals', 'browns', 'cleveland browns', 'steelers', 'pittsburgh steelers',
-        'texans', 'houston texans', 'colts', 'indianapolis colts', 'jaguars', 'jacksonville jaguars', 'titans', 'tennessee titans',
-        'broncos', 'denver broncos', 'chiefs', 'kansas city chiefs', 'raiders', 'las vegas raiders', 'chargers', 'los angeles chargers',
-        'cowboys', 'dallas cowboys', 'giants', 'new york giants', 'eagles', 'philadelphia eagles', 'commanders', 'washington commanders',
-        'bears', 'chicago bears', 'lions', 'detroit lions', 'packers', 'green bay packers', 'vikings', 'minnesota vikings',
-        'falcons', 'atlanta falcons', 'panthers', 'carolina panthers', 'saints', 'new orleans saints', 'buccaneers', 'tampa bay buccaneers',
-        'cardinals', 'arizona cardinals', 'rams', 'los angeles rams', '49ers', 'san francisco 49ers', 'seahawks', 'seattle seahawks',
-        // City names (for context matching)
-        'buffalo', 'miami', 'new england', 'new york', 'baltimore', 'cincinnati', 'cleveland', 'pittsburgh',
-        'houston', 'indianapolis', 'jacksonville', 'tennessee', 'denver', 'kansas city', 'las vegas', 'los angeles',
-        'dallas', 'philadelphia', 'washington', 'chicago', 'detroit', 'green bay', 'minnesota', 'atlanta',
-        'carolina', 'new orleans', 'tampa', 'tampa bay', 'arizona', 'san francisco', 'seattle',
-        // Team abbreviations
-        'buf', 'mia', 'ne', 'nyj', 'bal', 'cin', 'cle', 'pit', 'hou', 'ind', 'jax', 'ten', 'den', 'kc', 'lv', 'lac',
-        'dal', 'nyg', 'phi', 'was', 'wsh', 'chi', 'det', 'gb', 'min', 'atl', 'car', 'no', 'tb', 'ari', 'lar', 'sf', 'sea'
-      ];
+      const nflTeams = ['cowboys', 'lions', 'chiefs', 'bills', 'ravens', '49ers', 'rams', 'packers', 
+                        'dolphins', 'browns', 'texans', 'bengals', 'jaguars', 'colts', 'steelers', 
+                        'jets', 'broncos', 'raiders', 'chargers', 'patriots', 'titans', 'falcons', 
+                        'saints', 'buccaneers', 'panthers', 'cardinals', 'seahawks', 'commanders', 
+                        'giants', 'eagles', 'bears', 'vikings', 'dallas', 'detroit', 'kansas city',
+                        'cincinnati', 'buffalo', 'pittsburgh', 'baltimore', 'seattle', 'atlanta',
+                        'tennessee', 'cleveland', 'miami', 'new york', 'new orleans', 'tampa',
+                        'indianapolis', 'jacksonville', 'washington', 'minnesota', 'denver', 'las vegas',
+                        'chicago', 'green bay', 'los angeles', 'arizona', 'houston',
+                        'dal', 'det', 'kc', 'buf', 'bal', 'sf', 'lar', 'gb', 'mia', 'cle', 'hou', 
+                        'cin', 'jax', 'ind', 'pit', 'nyj', 'den', 'lv', 'lac', 'ne', 'ten', 'atl', 
+                        'no', 'tb', 'car', 'ari', 'sea', 'was', 'nyg', 'phi', 'chi', 'min'];
       
       console.log("[markets] Filtering", markets.length, "markets for NFL games (removing props)");
       
@@ -2067,28 +1684,7 @@ module.exports = async (req, res) => {
           return question.includes(team) || slug.includes(team) || eventTitle.includes(team);
         });
         
-        // Check for other sports - exclude if it's clearly not NFL
-        // Include college football, esports, soccer leagues, and other non-NFL sports
-        const otherSports = [
-          'nba', 'mlb', 'nhl', 'soccer', 'basketball', 'baseball', 'hockey', 'tennis', 'golf', 'ufc', 'boxing', 'cricket',
-          'premier league', 'la liga', 'serie a', 'bundesliga', 'college football', 'cfb', 'ncaa', 'dota', 'esports',
-          'miami', 'texas a&m', 'washington state', 'utah state', 'troy', 'jacksonville state', 'ac milan', 'hellas verona',
-          'team falcons', 'parivision', 'over', 'under'
-        ];
-        const hasOtherSport = otherSports.some(sport => {
-          const marketText = `${question} ${slug} ${eventTitle}`.toLowerCase();
-          // Exclude if it contains other sport terms (unless it also has strong NFL indicators)
-          if (marketText.includes(sport)) {
-            // If it has NFL tag or strong NFL indicators, keep it; otherwise exclude
-            return !marketText.includes('nfl') && !hasNflTeam;
-          }
-          return false;
-        });
-        
-        // STRICT: Must have NFL teams AND not be other sports
-        if (!hasNflTeam || hasOtherSport) {
-          return false; // Exclude if no NFL teams or if it's another sport
-        }
+        if (!hasNflTeam) return false; // Must mention NFL teams
         
         // Exclude props
         const isProp = 
@@ -2130,16 +1726,6 @@ module.exports = async (req, res) => {
         console.log("[markets] 1. Games aren't in the API yet");
         console.log("[markets] 2. Games are structured differently than expected");
         console.log("[markets] 3. Filtering is too strict");
-        console.log("[markets] Sample of markets that were filtered out (from earlier in pipeline):");
-        // Note: We can't access the original markets here, but the earlier logging should have shown them
-      }
-      
-      // If we still have markets after filtering, log a sample
-      if (markets.length > 0) {
-        console.log("[markets] Sample of remaining game markets (first 5):");
-        for (const m of markets.slice(0, 5)) {
-          console.log(`  - "${m.question || 'N/A'}" (Event: ${m.eventTitle || 'N/A'})`);
-        }
       }
     }
 
@@ -2196,14 +1782,14 @@ module.exports = async (req, res) => {
 
     const response = { 
       markets: transformed,
-      meta: { total: transformed.length, kind, platform: "polymarket" }
+      meta: { total: transformed.length, kind }
     };
 
-      // Cache the response (only for reasonable limits)
-      if (limitNum <= 1000) {
-        const cacheKey = getCacheKey(kind, sportType, "polymarket");
-        setCache(cacheKey, response);
-      }
+    // Cache the response (only for reasonable limits)
+    if (limitNum <= 1000) {
+      const cacheKey = getCacheKey(kind, sportType);
+      setCache(cacheKey, response);
+    }
 
       return res.status(200).json(response);
     } // End of API fallback block
