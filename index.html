@@ -2049,16 +2049,16 @@
           }
         }, 5000);
         
+        // Check if we're in Telegram environment (define before try block for closure access)
+        const isTelegram = window.Telegram?.WebApp !== undefined;
+        console.log('[TON Connect] Telegram environment:', isTelegram);
+        
         // Get the app URL (use current origin)
         const appUrl = window.location.origin;
         // Use API endpoint for manifest to ensure proper CORS headers
         const manifestUrl = `${appUrl}/api/tonconnect-manifest`;
         
         console.log('[TON Connect] Initializing with manifest:', manifestUrl);
-        
-        // Check if we're in Telegram environment
-        const isTelegram = window.Telegram?.WebApp !== undefined;
-        console.log('[TON Connect] Telegram environment:', isTelegram);
           
         // For Telegram Mini Apps, TON Connect should use Telegram Wallet natively
         // Configure to use TON Foundation's bridge service (not localhost)
@@ -2274,8 +2274,6 @@
           }
           
           console.log('[TON Connect] Initialization complete');
-        } else {
-          console.warn('[TON Connect] TonConnectUI not available');
         }
       } catch (error) {
         console.error('[TON Connect] Initialization error:', error);
