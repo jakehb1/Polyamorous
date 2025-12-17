@@ -1197,11 +1197,18 @@ module.exports = async (req, res) => {
               }
               
               let matchedEvents = 0;
+              let eventsSkippedNoMarkets = 0;
+              let eventsSkippedFilters = 0;
+              
+              console.log("[markets] Starting to process", allEvents.length, "NFL events for week", targetWeek);
               
               // Simple filtering: events already have NFL tag, so they're NFL events
               // Just filter by week and exclude college/props
               for (const event of allEvents) {
-                if (!event.markets || !Array.isArray(event.markets) || event.markets.length === 0) continue;
+                if (!event.markets || !Array.isArray(event.markets) || event.markets.length === 0) {
+                  eventsSkippedNoMarkets++;
+                  continue;
+                }
                 
                 const eventTitle = (event.title || "").toLowerCase();
                 const eventSlug = (event.slug || "").toLowerCase();
@@ -1298,9 +1305,12 @@ module.exports = async (req, res) => {
                 
                 // Filter by week: if we can extract week number, it must match target week
                 // But if we can't extract week, check if event date is within current week range
+                // TEMPORARILY: Make week filtering less strict for debugging - include events within 2 weeks of target
                 if (targetWeek !== null) {
-                  if (eventWeek !== null && eventWeek !== targetWeek) {
-                    continue; // Skip events from other weeks if we can confirm the week
+                  if (eventWeek !== null && Math.abs(eventWeek - targetWeek) > 2) {
+                    console.log("[markets] Skipping event - week mismatch:", event.title, "eventWeek:", eventWeek, "targetWeek:", targetWeek);
+                    eventsSkippedFilters++;
+                    continue; // Skip events more than 2 weeks away
                   }
                   
                   // If no week info, check event date to determine if it's in the target week
@@ -1310,27 +1320,25 @@ module.exports = async (req, res) => {
                     const now = new Date();
                     const currentYear = now.getFullYear();
                     
-                    // Calculate season start (first Thursday in September, around Sept 5-10)
+                    // Calculate season start using the same logic as getCurrentNFLWeek
                     let seasonStart = new Date(currentYear, 8, 1);
                     while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
-                    if (seasonStart.getDate() < 5) seasonStart.setDate(5);
-                    else if (seasonStart.getDate() > 10) seasonStart.setDate(5);
-                    
                     if (now < seasonStart) {
                       seasonStart = new Date(currentYear - 1, 8, 1);
                       while (seasonStart.getDay() !== 4) seasonStart.setDate(seasonStart.getDate() + 1);
-                      if (seasonStart.getDate() < 5) seasonStart.setDate(5);
-                      else if (seasonStart.getDate() > 10) seasonStart.setDate(5);
                     }
                     
                     // Calculate target week date range (each week is 7 days, Thu-Wed)
+                    // Include a 2-week window for debugging
                     const weekStart = new Date(seasonStart);
-                    weekStart.setDate(seasonStart.getDate() + (targetWeek - 1) * 7);
-                    const weekEnd = new Date(weekStart);
-                    weekEnd.setDate(weekStart.getDate() + 7);
+                    weekStart.setDate(seasonStart.getDate() + (targetWeek - 1 - 2) * 7); // 2 weeks before
+                    const weekEnd = new Date(seasonStart);
+                    weekEnd.setDate(seasonStart.getDate() + (targetWeek + 2) * 7); // 2 weeks after
                     
-                    // If event date is outside target week range, skip it
+                    // If event date is way outside the range, skip it
                     if (eventDate < weekStart || eventDate >= weekEnd) {
+                      console.log("[markets] Skipping event - date outside range:", event.title, "eventDate:", eventDate.toISOString(), "range:", weekStart.toISOString(), "to", weekEnd.toISOString());
+                      eventsSkippedFilters++;
                       continue;
                     }
                   }
@@ -1441,7 +1449,12 @@ module.exports = async (req, res) => {
                   }
                 }
               }
-              console.log("[markets] Matched", matchedEvents, "NFL events, found", markets.length, "markets");
+              console.log("[markets] Processing summary:");
+              console.log("[markets]   Total events:", allEvents.length);
+              console.log("[markets]   Skipped (no markets):", eventsSkippedNoMarkets);
+              console.log("[markets]   Skipped (filters):", eventsSkippedFilters);
+              console.log("[markets]   Matched events:", matchedEvents);
+              console.log("[markets]   Markets found:", markets.length);
               console.log("[markets] Added NFL game markets from events search");
               if (markets.length === 0 && matchedEvents > 0) {
                 console.log("[markets] WARNING: Found", matchedEvents, "NFL events but 0 markets. This suggests the market filtering is too strict.");
