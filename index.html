@@ -1726,6 +1726,10 @@
         </div>
       </div>
       <div class="wallet-status" id="walletStatusBar">Checking status...</div>
+      <div class="wallet-actions">
+        <button class="wallet-action-btn" id="fundWalletBtn" onclick="openFundModal()">Fund</button>
+        <button class="wallet-action-btn" id="withdrawWalletBtn" onclick="openWithdrawModal()">Withdraw</button>
+      </div>
       </div>
 
     <!-- Positions Card -->
@@ -1898,8 +1902,65 @@
         </div>
       </div>
       
-      <button class="trade-submit" id="fundSubmitBtn">Bridge TON to Polygon USDC</button>
+      <button class="trade-submit" id="fundSubmitBtn">Deposit TON</button>
       <button class="modal-close-btn" id="closeFundModal">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Withdrawal Modal -->
+  <div class="modal-overlay" id="withdrawModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h3 class="modal-title" id="withdrawModalTitle">Withdraw to TON</h3>
+      <p class="modal-subtitle" id="withdrawModalSubtitle">Withdraw USDC to your TON wallet</p>
+      
+      <div class="fund-info" id="withdrawInfo">
+        <div class="fund-ton-section">
+          <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 14px;">
+            Enter the amount to withdraw. Funds will be bridged from Polygon USDC to TON.
+          </p>
+          
+          <div class="fund-amount" style="margin-top: 16px;">
+            <label>Amount to Withdraw (USDC)</label>
+            <input type="number" id="withdrawAmount" placeholder="10.00" min="1" step="0.01" />
+            <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 4px;">
+              Minimum: $1 USDC. Your current balance is shown below.
+            </small>
+          </div>
+
+          <div id="withdrawBalanceDisplay" style="padding: 12px; background: var(--bg); border-radius: 8px; margin-top: 12px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Available Balance:</span>
+              <span id="withdrawAvailableBalance" style="font-weight: 600;">$0.00</span>
+            </div>
+          </div>
+
+          <div id="withdrawTONAddressSection" style="margin-top: 16px; padding: 16px; background: var(--bg); border-radius: 12px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">TON Destination Address</label>
+            <input type="text" id="withdrawTONAddress" placeholder="Enter TON address" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-family: monospace; font-size: 12px;" />
+            <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 4px;">
+              Funds will be sent to this address. Make sure it's correct.
+            </small>
+            <div id="withdrawAddressConfirm" style="margin-top: 8px; padding: 8px; background: var(--accent-light); border-radius: 8px; display: none;">
+              <span style="color: white; font-size: 12px;">✓ Address confirmed</span>
+            </div>
+          </div>
+
+          <div id="withdrawFeesInfo" style="margin-top: 16px; padding: 12px; background: var(--bg); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text-muted); font-size: 12px;">Estimated Fees:</span>
+              <span id="withdrawFees" style="font-size: 12px;">~$0.50</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted); font-size: 12px;">You'll Receive (approx):</span>
+              <span id="withdrawReceiveAmount" style="font-weight: 600; font-size: 14px;">0 TON</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <button class="trade-submit" id="withdrawSubmitBtn">Withdraw to TON</button>
+      <button class="modal-close-btn" id="closeWithdrawModal">Cancel</button>
     </div>
   </div>
 
@@ -3989,6 +4050,176 @@
       document.getElementById('fundModal').classList.remove('visible');
     }
 
+    // =====================
+    // WITHDRAWAL
+    // =====================
+    // Epic 5.1: Withdraw Funds to TON
+    function openWithdrawModal() {
+      hapticFeedback('medium');
+      const modal = document.getElementById('withdrawModal');
+      
+      // Check if user is authenticated
+      if (!state.sessionToken && !localStorage.getItem('session_token')) {
+        alert('Please connect your TON wallet and authenticate first.');
+        return;
+      }
+
+      // Update balance display
+      updateWithdrawBalance();
+      
+      // Pre-fill TON address if wallet is connected
+      const tonAddressInput = document.getElementById('withdrawTONAddress');
+      if (state.wallet && state.wallet.ton && tonAddressInput) {
+        tonAddressInput.value = state.wallet.ton;
+      }
+
+      document.getElementById('withdrawAmount').value = '';
+      modal.classList.add('visible');
+    }
+
+    function closeWithdrawModal() {
+      hapticFeedback('light');
+      document.getElementById('withdrawModal').classList.remove('visible');
+    }
+
+    async function updateWithdrawBalance() {
+      try {
+        // Get balance from state or API
+        const balanceEl = document.getElementById('withdrawAvailableBalance');
+        if (balanceEl) {
+          // Try to get from already loaded balance
+          const usdcBalanceEl = document.getElementById('usdcBalance');
+          if (usdcBalanceEl) {
+            const balanceText = usdcBalanceEl.textContent.replace('$', '').replace(',', '');
+            balanceEl.textContent = `$${parseFloat(balanceText || 0).toFixed(2)}`;
+          } else {
+            balanceEl.textContent = '$0.00';
+          }
+        }
+
+        // Update fees and receive amount estimates
+        const amountInput = document.getElementById('withdrawAmount');
+        if (amountInput) {
+          amountInput.addEventListener('input', () => {
+            const amount = parseFloat(amountInput.value) || 0;
+            const fees = 0.50; // Mock fees
+            const receiveTON = (amount - fees) / 2.5; // Mock conversion rate: 1 TON = $2.50
+            
+            const feesEl = document.getElementById('withdrawFees');
+            const receiveEl = document.getElementById('withdrawReceiveAmount');
+            
+            if (feesEl) feesEl.textContent = `~$${fees.toFixed(2)}`;
+            if (receiveEl) receiveEl.textContent = amount > 0 ? `~${receiveTON.toFixed(4)} TON` : '0 TON';
+          });
+        }
+      } catch (err) {
+        console.error('[updateWithdrawBalance] Error:', err);
+      }
+    }
+
+    async function submitWithdrawal() {
+      const amount = parseFloat(document.getElementById('withdrawAmount').value);
+      const tonAddress = document.getElementById('withdrawTONAddress')?.value?.trim();
+
+      if (!amount || amount <= 0) {
+        hapticFeedback('error');
+        alert('Please enter a valid amount');
+        return;
+      }
+
+      if (amount < 1) {
+        hapticFeedback('error');
+        alert('Minimum withdrawal amount is $1 USDC');
+        return;
+      }
+
+      if (!tonAddress) {
+        hapticFeedback('error');
+        alert('Please enter a TON destination address');
+        return;
+      }
+
+      // Basic TON address validation
+      if (!tonAddress.match(/^[0-9A-Za-z_-]{48}$/)) {
+        hapticFeedback('error');
+        alert('Invalid TON address format');
+        return;
+      }
+
+      const submitBtn = document.getElementById('withdrawSubmitBtn');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing...';
+      hapticFeedback('medium');
+
+      try {
+        const sessionToken = state.sessionToken || localStorage.getItem('session_token');
+        if (!sessionToken) {
+          throw new Error('Session expired. Please reconnect your TON wallet.');
+        }
+
+        // Generate idempotency key
+        const idempotencyKey = `withdraw_${state.telegramId}_${Date.now()}`;
+
+        const resp = await fetch('/api/withdraw/request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionToken}`
+          },
+          body: JSON.stringify({
+            amount_usdc: amount,
+            ton_destination_address: tonAddress,
+            idempotency_key: idempotencyKey
+            // TODO: Add address signature confirmation (Epic 5.2)
+          })
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          if (resp.status === 401) {
+            throw new Error('Session expired. Please reconnect your TON wallet.');
+          } else if (resp.status === 429) {
+            throw new Error('Too many withdrawal requests. Please wait a moment.');
+          } else if (resp.status === 400 && data.error === 'insufficient_balance') {
+            throw new Error(data.message || 'Insufficient balance for this withdrawal.');
+          } else if (resp.status === 400 && data.error === 'address_not_confirmed') {
+            throw new Error('Destination address must be confirmed. Please sign the address confirmation.');
+          }
+          throw new Error(data.message || data.error || 'Withdrawal failed');
+        }
+
+        if (data.success) {
+          hapticFeedback('success');
+          
+          const statusMsg = data.withdrawal.status === 'pending_review'
+            ? 'Withdrawal submitted for review (large amount). You will be notified once processed.'
+            : 'Withdrawal submitted successfully! Processing may take a few minutes.';
+          
+          alert(`${statusMsg}\n\nRequest ID: ${data.withdrawal.request_id}\nAmount: $${amount.toFixed(2)} USDC\nDestination: ${tonAddress.substring(0, 20)}...`);
+          
+          closeWithdrawModal();
+          
+          // Reload balance
+          setTimeout(async () => {
+            await loadBalance();
+          }, 2000);
+        } else {
+          throw new Error(data.message || 'Withdrawal failed');
+        }
+
+      } catch (err) {
+        console.error('[submitWithdrawal] Error:', err);
+        hapticFeedback('error');
+        alert(`Withdrawal failed: ${err.message}`);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
+
+    // Epic 3.1: Submit TON Deposit
     async function submitFunding() {
       const amount = parseFloat(document.getElementById('fundAmount').value);
 
@@ -4001,12 +4232,12 @@
       const minAmount = 0.1; // Minimum 0.1 TON
       if (amount < minAmount) {
         hapticFeedback('error');
-        alert(`Minimum bridge amount is ${minAmount} TON`);
+        alert(`Minimum deposit amount is ${minAmount} TON`);
         return;
       }
 
       // Check TON wallet is connected
-      if (!state.wallet || !state.wallet.ton) {
+      if (!state.wallet || !state.wallet.ton || !tonConnectUI || !tonConnectUI.wallet) {
         hapticFeedback('error');
         alert('Please connect your TON wallet first');
         return;
@@ -4015,32 +4246,65 @@
       const submitBtn = document.getElementById('fundSubmitBtn');
       const originalText = submitBtn.textContent;
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Bridging...';
+      submitBtn.textContent = 'Preparing...';
       hapticFeedback('medium');
 
       try {
-        // Call bridge API to bridge TON to Polygon USDC
-        // TODO: This will be implemented in Phase 2 - for now, show message
-        alert('Bridge functionality coming soon! This will bridge your TON to Polygon USDC for trading.\n\nAmount: ' + amount + ' TON');
+        // Epic 3.1: Request TON transaction signature from wallet
+        // For now, we'll use the deposit detection endpoint which simulates deposit
+        // In production, this would request user to sign a transaction to a deposit address
         
-        // For now, just close the modal
+        const tonAddress = state.wallet.ton;
+        const amountNanotons = Math.floor(amount * 1e9); // Convert TON to nanotons
+
+        // Generate a mock transaction hash for now
+        // In production, this would be the actual transaction hash from TonConnect
+        const mockTxHash = `mock_${Date.now()}_${crypto.getRandomValues(new Uint8Array(8)).join('')}`;
+
+        // Record deposit via detection endpoint (simulates deposit detection)
+        const sessionToken = state.sessionToken || localStorage.getItem('session_token');
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        if (sessionToken) {
+          headers['Authorization'] = `Bearer ${sessionToken}`;
+        }
+
+        const detectResp = await fetch('/api/deposit/detect', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({
+            ton_tx_hash: mockTxHash,
+            ton_address: tonAddress,
+            amount_ton: amount,
+            confirmations: 1 // Mock: assume 1 confirmation
+          })
+        });
+
+        if (!detectResp.ok) {
+          const errorData = await detectResp.json();
+          throw new Error(errorData.message || 'Deposit detection failed');
+        }
+
+        const detectData = await detectResp.json();
+        
+        submitBtn.textContent = 'Processing...';
+        
+        // Show success message
+        hapticFeedback('success');
+        alert(`Deposit submitted!\n\nAmount: ${amount} TON\nTransaction: ${mockTxHash.substring(0, 20)}...\n\nYour deposit is being processed and will be credited after confirmation.`);
+        
         closeFundModal();
         
-        // TODO: Once bridge API is ready, call it here:
-        // const resp = await fetch('/api/bridge/ton-to-polygon', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-        //     telegram_id: state.telegramId,
-        //     amount: amount,
-        //     ton_address: state.wallet.ton
-        //   })
-        // });
+        // Poll for deposit status
+        setTimeout(async () => {
+          await loadBalance();
+        }, 3000);
 
       } catch (err) {
         console.error('[submitFunding] Error:', err);
         hapticFeedback('error');
-        alert(`Bridge failed: ${err.message}`);
+        alert(`Deposit failed: ${err.message}`);
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
@@ -4365,6 +4629,22 @@
       });
 
       // Currency selector removed - only TON funding now
+
+      // Withdrawal modal initialization
+      const withdrawModal = document.getElementById('withdrawModal');
+      if (withdrawModal) {
+        withdrawModal.addEventListener('click', (e) => {
+          if (e.target.id === 'withdrawModal') closeWithdrawModal();
+        });
+      }
+
+      document.getElementById('closeWithdrawModal')?.addEventListener('click', () => {
+        closeWithdrawModal();
+      });
+
+      document.getElementById('withdrawSubmitBtn')?.addEventListener('click', () => {
+        submitWithdrawal();
+      });
 
       // Copy fund address button
       document.getElementById('copyFundAddressBtn')?.addEventListener('click', async () => {
