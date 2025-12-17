@@ -1011,7 +1011,9 @@ module.exports = async (req, res) => {
       }
       
       // Strategy 3: For NFL games, query events with NFL tag and filter by week
-      if (kind.toLowerCase() === "nfl" && isGamesOnly) {
+      // This is the ONLY path for NFL games - no fallback to all markets
+      if (kind.toLowerCase() === "nfl" && isGamesOnly && isSportsSubcategory) {
+        console.log("[markets] Entering NFL games-only path (no fallback to all markets)");
         // Determine target week: use provided week parameter, or default to current week
         const targetWeek = week ? parseInt(week, 10) : getCurrentNFLWeek();
         
