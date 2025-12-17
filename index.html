@@ -4216,26 +4216,52 @@
           wallet: state.wallet.polygon
         });
 
-        // Call trade API
+        // Generate idempotency key for duplicate request prevention
+        const idempotencyKey = `trade_${state.telegramId}_${marketId}_${side}_${amount}_${Date.now()}`;
+        
+        // Generate nonce for replay protection
+        const nonce = crypto.getRandomValues(new Uint8Array(32));
+        const nonceBase64 = btoa(String.fromCharCode(...nonce));
+        
+        // Get session token (if authenticated)
+        const sessionToken = state.sessionToken || localStorage.getItem('session_token');
+        
+        // Prepare headers with session token
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        if (sessionToken) {
+          headers['Authorization'] = `Bearer ${sessionToken}`;
+        }
+        
+        // Call trade API with session token and security keys
         const resp = await fetch('/api/trade', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: headers,
           body: JSON.stringify({
+            // Include telegram_id as fallback (will be deprecated in favor of session token)
             telegram_id: state.telegramId,
             market_id: marketId,
             condition_id: marketId,
             outcome_index: outcomeIndex,
             side: side,
             amount: amount,
-            wallet_address: state.wallet.polygon
+            idempotency_key: idempotencyKey,
+            nonce: nonceBase64
           })
         });
 
         const data = await resp.json();
 
         if (!resp.ok) {
+          // Handle specific error cases
+          if (resp.status === 401) {
+            throw new Error('Session expired. Please reconnect your TON wallet.');
+          } else if (resp.status === 429) {
+            throw new Error('Too many requests. Please wait a moment and try again.');
+          } else if (resp.status === 400 && data.error === 'insufficient_balance') {
+            throw new Error(data.message || 'Insufficient balance for this trade.');
+          }
           throw new Error(data.message || data.error || 'Trade failed');
         }
 
