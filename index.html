@@ -57,19 +57,19 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     :root {
-      --bg: #EAF5FB;
-      --card: #d8edf8;
-      --text: #687E90;
-      --text-muted: #8a9ba8;
-      --accent: #687E90;
-      --accent-light: #4B4B4B;
-      --accent-pink: #4B4B4B;
-      --green: #4B4B4B;
-      --green-soft: #6b6b6b;
-      --red: #d97777;
-      --border: #c5d9e8;
-      --bg-secondary: #e0f0f8;
-      --card-hover: #c8e0f0;
+      --bg: #F9F9F4;
+      --card: #ffffff;
+      --text: #252521;
+      --text-muted: #6b6b6b;
+      --accent: #252521;
+      --accent-light: #252521;
+      --accent-pink: #252521;
+      --green: #489137;
+      --green-soft: #489137;
+      --red: #9F2022;
+      --border: #e0e0e0;
+      --bg-secondary: #f0f0f0;
+      --card-hover: #f5f5f5;
       --radius: 24px;
       --radius-sm: 16px;
       --shadow: none;
@@ -856,7 +856,7 @@
     }
     .odds-yes {
       background: var(--green);
-      color: var(--text);
+      color: white;
       padding: 6px 12px;
       border-radius: 20px;
       font-size: 13px;
@@ -1135,17 +1135,17 @@
       transform: scale(0.95);
     }
     .outcome-yes {
-      background: var(--accent-pink);
+      background: var(--green);
       color: white;
-      border-color: var(--accent-pink);
+      border-color: var(--green);
     }
     .outcome-yes:active {
       opacity: 0.9;
     }
     .outcome-no {
-      background: var(--bg);
-      color: var(--text);
-      border-color: var(--border);
+      background: var(--red);
+      color: white;
+      border-color: var(--red);
     }
     .outcome-no:active {
       background: var(--card);
@@ -1591,9 +1591,9 @@
       color: white;
     }
     .buy-btn-no {
-      background: var(--bg);
-      color: var(--text);
-      border: 2px solid var(--border);
+      background: var(--red);
+      color: white;
+      border: 2px solid var(--red);
     }
     .buy-btn-label {
       font-size: 11px;
@@ -3330,6 +3330,11 @@
           const outcome1 = primaryOutcomes[0] || 'Yes';
           const outcome2 = primaryOutcomes[1] || 'No';
           
+          // Get NFL team colors if this is an NFL event
+          const teamColors = getNFLTeamColors(event.eventTitle, outcome1, outcome2);
+          const btn1Style = teamColors.team1 ? `background: ${teamColors.team1}; color: white;` : '';
+          const btn2Style = teamColors.team2 ? `background: ${teamColors.team2}; color: white;` : '';
+          
           return `
             <div class="event-group collapsed" data-event-id="${event.eventId}">
               <div class="event-header collapsed" data-collapse-target="${event.eventId}">
@@ -3349,12 +3354,14 @@
                   ${primaryPrices.length >= 2 ? `
                     <button class="event-price-btn event-price-btn-1" 
                             data-market-id="${moneylineMarket?.id}" 
-                            data-outcome-index="0">
+                            data-outcome-index="0"
+                            style="${btn1Style}">
                       ${outcome1} ${price1}
                     </button>
                     <button class="event-price-btn event-price-btn-2" 
                             data-market-id="${moneylineMarket?.id}" 
-                            data-outcome-index="1">
+                            data-outcome-index="1"
+                            style="${btn2Style}">
                       ${outcome2} ${price2}
                     </button>
                   ` : ''}

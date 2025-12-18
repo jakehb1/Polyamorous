@@ -218,8 +218,21 @@ module.exports = async (req, res) => {
           if (ledgerEntryId) {
             try {
               await updateLedgerEntryStatus(ledgerEntryId, 'completed', null, null);
+              
+              // Log completion
+              logTransaction('deposit_completed', {
+                user_id: wallet.user_id,
+                deposit_id: deposit.id,
+                ledger_entry_id: ledgerEntryId,
+                amount_usdc: amountUSDC
+              });
             } catch (ledgerError) {
-              console.error("[deposit/detect] Ledger update failed:", ledgerError);
+              logError(ledgerError, {
+                operation: 'ledger_entry_update',
+                user_id: wallet.user_id,
+                deposit_id: deposit.id,
+                ledger_entry_id: ledgerEntryId
+              });
             }
           }
 
