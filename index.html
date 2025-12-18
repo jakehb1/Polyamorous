@@ -2615,6 +2615,110 @@
       return `$${Number(num || 0).toFixed(2)}`;
     }
 
+    // NFL Team Colors
+    const NFL_TEAM_COLORS = {
+      'chiefs': '#E31837', 'kansas city': '#E31837',
+      'bills': '#00338D', 'buffalo': '#00338D',
+      'ravens': '#241773', 'baltimore': '#241773',
+      'bengals': '#FB4F14', 'cincinnati': '#FB4F14',
+      'browns': '#311D00', 'cleveland': '#311D00',
+      'broncos': '#FB4F14', 'denver': '#FB4F14',
+      'texans': '#03202F', 'houston': '#03202F',
+      'colts': '#002C5F', 'indianapolis': '#002C5F',
+      'jaguars': '#006778', 'jacksonville': '#006778',
+      'dolphins': '#008E97', 'miami': '#008E97',
+      'patriots': '#002244', 'new england': '#002244',
+      'jets': '#125740', 'new york jets': '#125740', 'ny jets': '#125740',
+      'raiders': '#000000', 'las vegas': '#000000', 'oakland': '#000000',
+      'steelers': '#FFB612', 'pittsburgh': '#FFB612',
+      'chargers': '#0080C6', 'los angeles chargers': '#0080C6', 'la chargers': '#0080C6',
+      'titans': '#0C2340', 'tennessee': '#0C2340',
+      'cowboys': '#003594', 'dallas': '#003594',
+      'giants': '#0B2265', 'new york giants': '#0B2265', 'ny giants': '#0B2265',
+      'eagles': '#004C54', 'philadelphia': '#004C54',
+      'commanders': '#5A1414', 'washington': '#5A1414', 'redskins': '#5A1414',
+      'bears': '#0B162A', 'chicago': '#0B162A',
+      'lions': '#0076B6', 'detroit': '#0076B6',
+      'packers': '#203731', 'green bay': '#203731',
+      'vikings': '#4F2683', 'minnesota': '#4F2683',
+      'falcons': '#A71930', 'atlanta': '#A71930',
+      'panthers': '#0085CA', 'carolina': '#0085CA',
+      'saints': '#D3BC8D', 'new orleans': '#D3BC8D',
+      'buccaneers': '#D50A0A', 'tampa bay': '#D50A0A', 'tampa': '#D50A0A',
+      'cardinals': '#97233F', 'arizona': '#97233F',
+      'rams': '#003594', 'los angeles rams': '#003594', 'la rams': '#003594',
+      '49ers': '#AA0000', 'san francisco': '#AA0000', 'sf 49ers': '#AA0000',
+      'seahawks': '#002244', 'seattle': '#002244'
+    };
+
+    function getNFLTeamColors(eventTitle, outcome1, outcome2) {
+      if (!eventTitle || typeof eventTitle !== 'string') {
+        return { team1: null, team2: null };
+      }
+
+      const titleLower = eventTitle.toLowerCase();
+      const outcome1Lower = (outcome1 || '').toLowerCase();
+      const outcome2Lower = (outcome2 || '').toLowerCase();
+
+      // Try to extract team names from event title (e.g., "Chiefs vs Bills")
+      const vsMatch = titleLower.match(/(.+?)\s+vs\.?\s+(.+)/);
+      let team1Name = null;
+      let team2Name = null;
+
+      if (vsMatch) {
+        team1Name = vsMatch[1].trim();
+        team2Name = vsMatch[2].trim();
+      } else {
+        // Try to match outcomes to team names
+        for (const [key, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (outcome1Lower.includes(key) || titleLower.includes(key)) {
+            team1Name = key;
+            break;
+          }
+        }
+        for (const [key, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (outcome2Lower.includes(key) || (titleLower.includes(key) && key !== team1Name)) {
+            team2Name = key;
+            break;
+          }
+        }
+      }
+
+      // Get colors
+      let team1Color = null;
+      let team2Color = null;
+
+      if (team1Name) {
+        for (const [key, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (team1Name.includes(key) || outcome1Lower.includes(key)) {
+            team1Color = color;
+            break;
+          }
+        }
+      }
+
+      if (team2Name) {
+        for (const [key, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (team2Name.includes(key) || outcome2Lower.includes(key)) {
+            team2Color = color;
+            break;
+          }
+        }
+      }
+
+      // Fallback: if we found one team but not the other, try to find the second team
+      if (team1Color && !team2Color) {
+        for (const [key, color] of Object.entries(NFL_TEAM_COLORS)) {
+          if (titleLower.includes(key) && key !== team1Name && !outcome1Lower.includes(key)) {
+            team2Color = color;
+            break;
+          }
+        }
+      }
+
+      return { team1: team1Color, team2: team2Color };
+    }
+
     function formatVolume(num) {
       if (!num) return '$0';
       if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
