@@ -88,7 +88,7 @@
     .splash-screen {
       position: fixed;
       inset: 0;
-      background: #F9F9F4;
+      background: #F9F9F4 !important;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -99,7 +99,7 @@
     .splash-screen.hidden { 
       opacity: 0; 
       pointer-events: none;
-      display: none;
+      display: none !important;
     }
     
     .splash-logo {
@@ -107,11 +107,13 @@
       align-items: center;
       justify-content: center;
       margin-bottom: 32px;
+      width: 100%;
     }
     .splash-logo img {
-      max-width: 200px;
+      max-width: 250px;
+      width: 80%;
       height: auto;
-      width: auto;
+      object-fit: contain;
     }
     
     .splash-spinner {
@@ -1640,9 +1642,9 @@
 </head>
 <body>
   <!-- Splash Screen -->
-  <div class="splash-screen" id="splashScreen">
+  <div class="splash-screen" id="splashScreen" style="background: #F9F9F4;">
     <div class="splash-logo">
-      <img src="/assets/polygram-logo.png" alt="Polygram" />
+      <img src="./assets/polygram-logo.png" alt="Polygram" onerror="this.style.display='none'; console.error('Logo failed to load');" />
     </div>
     <div class="splash-spinner"></div>
   </div>
@@ -4909,21 +4911,35 @@
 
     async function bootstrapApp() {
       console.log('Bootstrapping app...');
-      initTelegram();
-      initTONConnect(); // Initialize TON Connect
-      initModeChips();
-      initTradeModal();
-      initFundModal();
-      await initCategories();
+      try {
+        initTelegram();
+        initTONConnect(); // Initialize TON Connect
+        initModeChips();
+        initTradeModal();
+        initFundModal();
+        
+        // Initialize categories (non-blocking)
+        initCategories().catch(err => {
+          console.error('[Bootstrap] Categories init error:', err);
+        });
 
-
-      await loadWallet();
-      
-      // Load transaction history
-      loadTransactionHistory('all');
-      
-      // Markets will be fetched by initCategories()
-      console.log('Bootstrap complete');
+        // Load wallet (non-blocking)
+        loadWallet().catch(err => {
+          console.error('[Bootstrap] Wallet load error:', err);
+        });
+        
+        // Load transaction history (non-blocking)
+        setTimeout(() => {
+          loadTransactionHistory('all').catch(err => {
+            console.error('[Bootstrap] History load error:', err);
+          });
+        }, 500);
+        
+        console.log('Bootstrap complete');
+      } catch (err) {
+        console.error('[Bootstrap] Error:', err);
+        throw err;
+      }
     }
 
     // =====================
