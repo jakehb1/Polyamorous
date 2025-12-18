@@ -2294,7 +2294,7 @@
               // Phase 1.4: Network detection and blocking
               // Check if app is in mainnet mode and wallet is testnet
               const isMainnetMode = true; // TODO: Make this configurable via environment variable
-              if (isMainnetMode && network === 'testnet' || network === '-239') {
+              if (isMainnetMode && (network === 'testnet' || network === '-239')) {
                 console.error('[TON Connect] Testnet wallet blocked in mainnet mode');
                 alert('Testnet wallets are not allowed. Please connect a mainnet wallet.');
                 // Disconnect the testnet wallet
