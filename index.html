@@ -1920,12 +1920,12 @@
             Connect your TON wallet to fund your account. Funds will be automatically bridged to Polygon USDC for trading.
           </p>
           
-          <div id="tonWalletStatus" style="padding: 16px; background: var(--bg); border-radius: 12px; margin-bottom: 16px;">
+            <div id="tonWalletStatus" style="padding: 16px; background: var(--bg); border-radius: 12px; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
               <span style="font-weight: 600;">TON Wallet Status:</span>
-              <span id="tonWalletStatusText" style="color: var(--text-muted);">Not Connected</span>
+              <span id="tonWalletStatusText" style="color: var(--text-muted); font-weight: 500;">Not Connected</span>
             </div>
-            <div id="tonWalletAddressDisplay" style="font-family: monospace; font-size: 12px; color: var(--text); word-break: break-all; margin-bottom: 12px; display: none;"></div>
+            <div id="tonWalletAddressDisplay" style="font-family: monospace; font-size: 12px; color: var(--text); word-break: break-all; margin-bottom: 12px; padding: 8px; background: var(--card); border-radius: 6px; display: none;"></div>
             <div id="tonConnectButtonArea"></div>
           </div>
           
@@ -2219,8 +2219,16 @@
               
               if (!tonConnectUI) {
                 console.error('[TON Connect] tonConnectUI not initialized');
-                alert('TON Connect is not initialized. Please refresh the page.');
+                // Try to initialize again
+                setTimeout(() => initTONConnect(), 500);
+                alert('TON Connect is initializing. Please wait a moment and try again.');
                 return;
+              }
+              
+              // Open fund modal first, then connect (so user can fund immediately after connecting)
+              const fundModal = document.getElementById('fundModal');
+              if (!fundModal || !fundModal.classList.contains('visible')) {
+                openFundModal();
               }
               
               try {
@@ -2300,6 +2308,9 @@
         tonConnectUI.onStatusChange((walletInfo) => {
             console.log('[TON Connect] Wallet status changed:', walletInfo);
             
+            // Update connection status indicator
+            updateTONConnectionStatus(walletInfo ? 'connected' : 'disconnected');
+            
             if (walletInfo) {
               // Wallet connected - extract full session data
               const tonAddress = walletInfo.account.address;
@@ -2325,6 +2336,9 @@
                 });
                 return;
               }
+              
+              // Update connection status
+              updateTONConnectionStatus('connected');
               
               // Update UI
               const tonEl = document.getElementById('tonWalletAddress');
@@ -2372,9 +2386,40 @@
               setupClickableAddress('tonWalletAddress', tonAddress);
               
               hapticFeedback('success');
+              
+              // Update fund modal status if it's open
+              const fundModal = document.getElementById('fundModal');
+              if (fundModal && fundModal.classList.contains('visible')) {
+                // Modal is open, update its status
+                const tonStatusText = document.getElementById('tonWalletStatusText');
+                const tonAddressDisplay = document.getElementById('tonWalletAddressDisplay');
+                const tonConnectArea = document.getElementById('tonConnectButtonArea');
+                
+                if (tonStatusText) {
+                  tonStatusText.textContent = 'Connected';
+                  tonStatusText.style.color = 'var(--green)';
+                }
+                
+                if (tonAddressDisplay) {
+                  tonAddressDisplay.textContent = tonAddress;
+                  tonAddressDisplay.style.display = 'block';
+                }
+                
+                if (tonConnectArea) {
+                  tonConnectArea.innerHTML = '<p style="color: var(--green); font-size: 12px; font-weight: 600;">✓ TON wallet connected</p>';
+                }
+              } else {
+                // Modal not open, auto-open it to allow immediate funding
+                setTimeout(() => {
+                  openFundModal();
+                }, 500);
+              }
             } else {
               // Wallet disconnected - Phase 1.3: Handle disconnect gracefully
               console.log('[TON Connect] Wallet disconnected');
+              
+              // Update connection status
+              updateTONConnectionStatus('disconnected');
               
               // Clear session data from backend
               clearTONSession();
@@ -2401,6 +2446,8 @@
                   };
                 }
               }
+              const disconnectBtn = document.getElementById('disconnectTonBtn');
+              if (disconnectBtn) disconnectBtn.style.display = 'none';
               
               // Update state
               if (state.wallet) {
@@ -2429,6 +2476,9 @@
               return;
             }
             
+            // Update connection status
+            updateTONConnectionStatus('connected');
+            
             // Update UI
             const tonEl = document.getElementById('tonWalletAddress');
             const tonCopyBtn = document.getElementById('copyTonBtn');
@@ -2439,6 +2489,8 @@
             if (connectContainer) connectContainer.style.display = 'none';
             const fallbackBtn = document.getElementById('connectTonBtnFallback');
             if (fallbackBtn) fallbackBtn.style.display = 'none';
+            const disconnectBtn = document.getElementById('disconnectTonBtn');
+            if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
             
             // Save full session to backend
             const sessionData = {
@@ -2472,6 +2524,26 @@
         console.log('[TON Connect] Initialization complete');
       } catch (error) {
         console.error('[TON Connect] Initialization error:', error);
+      }
+    }
+
+    // Update TON connection status indicator
+    function updateTONConnectionStatus(status) {
+      const statusBar = document.getElementById('walletStatusBar');
+      if (!statusBar) return;
+      
+      if (status === 'connected') {
+        statusBar.textContent = '✓ TON wallet connected - ready to fund';
+        statusBar.style.background = 'var(--green)';
+        statusBar.style.color = 'white';
+      } else if (status === 'connecting') {
+        statusBar.textContent = 'Connecting TON wallet...';
+        statusBar.style.background = 'var(--accent)';
+        statusBar.style.color = 'white';
+      } else {
+        statusBar.textContent = '✓ Connect TON wallet to fund your account';
+        statusBar.style.background = 'var(--accent)';
+        statusBar.style.color = 'white';
       }
     }
 
@@ -2941,11 +3013,13 @@
         const fallbackBtn = document.getElementById('connectTonBtnFallback');
         
         if (tonEl) {
+          const disconnectBtn = document.getElementById('disconnectTonBtn');
           if (wallet.ton) {
             tonEl.textContent = wallet.ton;
             if (tonCopyBtn) tonCopyBtn.style.display = 'inline-flex';
             if (connectContainer) connectContainer.style.display = 'none';
             if (fallbackBtn) fallbackBtn.style.display = 'none';
+            if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
             setupCopyButton('copyTonBtn', wallet.ton);
             setupClickableAddress('tonWalletAddress', wallet.ton);
           } else {
@@ -2953,27 +3027,24 @@
             if (tonCopyBtn) tonCopyBtn.style.display = 'none';
             if (connectContainer) connectContainer.style.display = 'block';
             if (fallbackBtn) fallbackBtn.style.display = 'inline-flex';
+            if (disconnectBtn) disconnectBtn.style.display = 'none';
           }
         }
         
         // Update status
+        if (wallet.ton) {
+          updateTONConnectionStatus('connected');
+        } else {
+          updateTONConnectionStatus('disconnected');
+        }
+        
+        // Check for warnings (like encryption key missing)
         const statusEl = document.getElementById('walletStatusBar');
-        if (statusEl) {
-          // Check for warnings (like encryption key missing)
-          if (data.warning || data.error === 'encryption_key_missing') {
-            statusEl.textContent = '⚠ Wallet created (not saved - config issue)';
-            statusEl.style.background = 'var(--yellow)';
-            statusEl.style.color = 'var(--text)';
-            console.warn('Wallet warning:', data.warning || data.help);
-          } else {
-            if (wallet.ton) {
-              statusEl.textContent = '✓ TON wallet connected - ready to fund';
-            } else {
-              statusEl.textContent = '✓ Connect TON wallet to fund your account';
-            }
-            statusEl.style.background = 'var(--accent)';
-            statusEl.style.color = 'white';
-          }
+        if (statusEl && (data.warning || data.error === 'encryption_key_missing')) {
+          statusEl.textContent = '⚠ Wallet created (not saved - config issue)';
+          statusEl.style.background = 'var(--red)';
+          statusEl.style.color = 'white';
+          console.warn('Wallet warning:', data.warning || data.help);
         }
         
         // If TON address exists in wallet but not connected in TON Connect, show it
@@ -4166,12 +4237,7 @@
     function openFundModal() {
       hapticFeedback('medium');
       const modal = document.getElementById('fundModal');
-      
-      // Check if TON wallet is connected
-      if (!state.wallet || !state.wallet.ton) {
-        alert('Please connect your TON wallet first. Click "Connect TON" in the wallet section.');
-        return;
-      }
+      const isWalletConnected = state.wallet && state.wallet.ton;
 
       // Update TON wallet status in modal
       const tonStatusText = document.getElementById('tonWalletStatusText');
@@ -4179,17 +4245,36 @@
       const tonConnectArea = document.getElementById('tonConnectButtonArea');
       
       if (tonStatusText) {
-        tonStatusText.textContent = 'Connected';
-        tonStatusText.style.color = 'var(--green)';
+        if (isWalletConnected) {
+          tonStatusText.textContent = 'Connected';
+          tonStatusText.style.color = 'var(--green)';
+        } else {
+          tonStatusText.textContent = 'Not Connected';
+          tonStatusText.style.color = 'var(--text-muted)';
+        }
       }
       
-      if (tonAddressDisplay && state.wallet.ton) {
-        tonAddressDisplay.textContent = state.wallet.ton;
-        tonAddressDisplay.style.display = 'block';
+      if (tonAddressDisplay) {
+        if (isWalletConnected && state.wallet.ton) {
+          tonAddressDisplay.textContent = state.wallet.ton;
+          tonAddressDisplay.style.display = 'block';
+        } else {
+          tonAddressDisplay.style.display = 'none';
+        }
       }
       
       if (tonConnectArea) {
-        tonConnectArea.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">✓ TON wallet connected</p>';
+        if (isWalletConnected) {
+          tonConnectArea.innerHTML = '<p style="color: var(--green); font-size: 12px; font-weight: 600;">✓ TON wallet connected</p>';
+        } else {
+          // Show connect button in modal if not connected
+          tonConnectArea.innerHTML = `
+            <button class="wallet-action-btn" onclick="if (tonConnectUI) { tonConnectUI.openModal(); } else { document.getElementById('connectTonBtnFallback')?.click(); }" style="width: 100%; margin-top: 8px;">
+              Connect TON Wallet
+            </button>
+            <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">Connect your TON wallet to fund your account</p>
+          `;
+        }
       }
 
       document.getElementById('fundAmount').value = '';
@@ -4923,6 +5008,56 @@
       // Payout modal backdrop
       document.getElementById('payoutModal')?.addEventListener('click', (e) => {
         if (e.target.id === 'payoutModal') closePayoutModal();
+      });
+
+      // TON Wallet disconnect button
+      document.getElementById('disconnectTonBtn')?.addEventListener('click', async () => {
+        if (!tonConnectUI) {
+          console.warn('[TON Connect] Cannot disconnect: tonConnectUI not initialized');
+          return;
+        }
+
+        try {
+          hapticFeedback('light');
+          const confirmed = confirm('Are you sure you want to disconnect your TON wallet?');
+          if (!confirmed) return;
+
+          await tonConnectUI.disconnect();
+          console.log('[TON Connect] Wallet disconnected by user');
+          
+          // Clear session data from backend
+          await clearTONSession();
+          
+          // Update UI (onStatusChange will also handle this, but we do it here for immediate feedback)
+          const tonEl = document.getElementById('tonWalletAddress');
+          const tonCopyBtn = document.getElementById('copyTonBtn');
+          const disconnectBtn = document.getElementById('disconnectTonBtn');
+          const connectContainer = document.getElementById('tonConnectButtonContainer');
+          const fallbackBtn = document.getElementById('connectTonBtnFallback');
+
+          if (tonEl) tonEl.textContent = 'Not connected';
+          if (tonCopyBtn) tonCopyBtn.style.display = 'none';
+          if (disconnectBtn) disconnectBtn.style.display = 'none';
+          if (connectContainer) connectContainer.style.display = 'block';
+          if (fallbackBtn) fallbackBtn.style.display = 'inline-flex';
+
+          // Update state
+          if (state.wallet) {
+            state.wallet.ton = null;
+            state.wallet.tonAppName = null;
+            state.wallet.tonNetwork = null;
+          }
+
+          // Clear session token
+          state.sessionToken = null;
+          state.isAuthenticated = false;
+          localStorage.removeItem('session_token');
+
+          hapticFeedback('success');
+        } catch (err) {
+          console.error('[TON Connect] Error disconnecting:', err);
+          alert('Failed to disconnect wallet: ' + err.message);
+        }
       });
     }
 
