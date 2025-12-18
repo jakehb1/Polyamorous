@@ -57,7 +57,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     :root {
-      --bg: #F9F9F4;
+      --bg: #F9F9F4 !important;
       --card: #ffffff;
       --text: #252521;
       --text-muted: #6b6b6b;
@@ -1642,11 +1642,11 @@
 </head>
 <body>
   <!-- Splash Screen -->
-  <div class="splash-screen" id="splashScreen" style="background: #F9F9F4;">
-    <div class="splash-logo">
-      <img src="./assets/polygram-logo.png" alt="Polygram" onerror="this.style.display='none'; console.error('Logo failed to load');" />
+  <div class="splash-screen" id="splashScreen" style="background: #F9F9F4 !important; position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="splash-logo" style="display: flex; align-items: center; justify-content: center; margin-bottom: 32px; width: 100%;">
+      <img src="assets/polygram-logo.png" alt="Polygram" style="max-width: 250px; width: 80%; height: auto; object-fit: contain;" onerror="console.error('Logo failed to load from:', this.src);" />
     </div>
-    <div class="splash-spinner"></div>
+    <div class="splash-spinner" style="width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #252521; border-radius: 50%; animation: spin 1s linear infinite;"></div>
   </div>
 
   <!-- Onboarding Screen -->
