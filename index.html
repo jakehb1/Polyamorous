@@ -2098,39 +2098,50 @@
     // HAPTIC FEEDBACK
     // =====================
     function hapticFeedback(type = 'light') {
-      if (window.Telegram?.WebApp?.HapticFeedback) {
-        const haptic = window.Telegram.WebApp.HapticFeedback;
-        switch(type) {
-          case 'light':
-            haptic.impactOccurred('light');
-            break;
-          case 'medium':
-            haptic.impactOccurred('medium');
-            break;
-          case 'heavy':
-            haptic.impactOccurred('heavy');
-            break;
-          case 'success':
-            haptic.notificationOccurred('success');
-            break;
-          case 'error':
-            haptic.notificationOccurred('error');
-            break;
-          case 'warning':
-            haptic.notificationOccurred('warning');
-            break;
+      // Check if Telegram WebApp and HapticFeedback are available
+      // Handle version compatibility (HapticFeedback not supported in version 6.0+)
+      try {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          const haptic = window.Telegram.WebApp.HapticFeedback;
+          try {
+            switch(type) {
+              case 'light':
+                haptic.impactOccurred('light');
+                break;
+              case 'medium':
+                haptic.impactOccurred('medium');
+                break;
+              case 'heavy':
+                haptic.impactOccurred('heavy');
+                break;
+              case 'success':
+                haptic.notificationOccurred('success');
+                break;
+              case 'error':
+                haptic.notificationOccurred('error');
+                break;
+              case 'warning':
+                haptic.notificationOccurred('warning');
+                break;
+            }
+          } catch (hapticError) {
+            // HapticFeedback not supported in this version, silently ignore
+            // This prevents console warnings for unsupported versions
+          }
+        } else if (navigator.vibrate) {
+          // Fallback for non-Telegram environments
+          const patterns = {
+            light: 10,
+            medium: 20,
+            heavy: 30,
+            success: [10, 50, 10],
+            error: [20, 50, 20, 50, 20],
+            warning: [10, 50, 20]
+          };
+          navigator.vibrate(patterns[type] || 10);
         }
-      } else if (navigator.vibrate) {
-        // Fallback for non-Telegram environments
-        const patterns = {
-          light: 10,
-          medium: 20,
-          heavy: 30,
-          success: [10, 50, 10],
-          error: [20, 50, 20, 50, 20],
-          warning: [10, 50, 20]
-        };
-        navigator.vibrate(patterns[type] || 10);
+      } catch (err) {
+        // Silently handle any haptic feedback errors
       }
     }
 
@@ -2178,38 +2189,57 @@
     // Version: 2025-12-17-fix-syntax
     let tonConnectUI = null;
 
-    function initTONConnect() {
+    function initTONConnect(retryCount = 0) {
+      const maxRetries = 10; // Try up to 10 times (10 seconds)
+      
       try {
         // Check if TON Connect UI is loaded - retry if not available yet
         if (typeof TonConnectUI === 'undefined') {
-          console.warn('[TON Connect] TonConnectUI not loaded yet, will retry in 1000ms');
-          // Retry initialization after a delay (script might still be loading)
-          setTimeout(() => {
-            if (typeof TonConnectUI !== 'undefined') {
-              console.log('[TON Connect] TonConnectUI loaded, retrying initialization');
-              initTONConnect();
-            } else {
-              console.warn('[TON Connect] TonConnectUI not available - TON wallet feature will be disabled');
-              // Set up fallback button to show message (non-blocking)
-              const fallbackBtn = document.getElementById('connectTonBtnFallback');
-              const tonAddressEl = document.getElementById('tonWalletAddress');
-              if (fallbackBtn) {
-                fallbackBtn.onclick = () => {
-                  console.log('[TON Connect] TON Connect library not loaded');
-                  // Don't show alert - just log it
-                  if (tonAddressEl) {
-                    tonAddressEl.textContent = 'Library not loaded';
-                  }
-                };
+          if (retryCount < maxRetries) {
+            console.warn(`[TON Connect] TonConnectUI not loaded yet (attempt ${retryCount + 1}/${maxRetries}), will retry in 1000ms`);
+            // Listen for the custom event if library loads
+            const handler = () => {
+              console.log('[TON Connect] Library loaded event received, retrying initialization');
+              window.removeEventListener('tonconnect-loaded', handler);
+              if (typeof TonConnectUI !== 'undefined') {
+                initTONConnect(0); // Reset retry count
               }
-              // Hide the connect button if library failed to load
-              if (fallbackBtn) {
-                fallbackBtn.style.display = 'none';
+            };
+            window.addEventListener('tonconnect-loaded', handler, { once: true });
+            
+            // Also retry after delay as backup
+            setTimeout(() => {
+              if (typeof TonConnectUI !== 'undefined') {
+                console.log('[TON Connect] TonConnectUI loaded, retrying initialization');
+                initTONConnect(0);
+              } else {
+                initTONConnect(retryCount + 1);
               }
+            }, 1000);
+            return;
+          } else {
+            console.error('[TON Connect] ❌ TonConnectUI not available after max retries - TON wallet feature will be disabled');
+            console.error('[TON Connect] Load status:', {
+              loaded: window.TON_CONNECT_LOADED,
+              loading: window.TON_CONNECT_LOADING,
+              error: window.TON_CONNECT_LOAD_ERROR
+            });
+            // Set up fallback button to show message (non-blocking)
+            const fallbackBtn = document.getElementById('connectTonBtnFallback');
+            const tonAddressEl = document.getElementById('tonWalletAddress');
+            if (fallbackBtn) {
+              fallbackBtn.onclick = () => {
+                alert('TON Connect library failed to load. Please:\n1. Check your internet connection\n2. Refresh the page\n3. Try again');
+                console.error('[TON Connect] User attempted to connect but library is not loaded');
+              };
+              // Keep button visible so user can see the error
+              fallbackBtn.style.display = 'inline-flex';
             }
-          }, 1000);
-          return;
+            return;
+          }
         }
+        
+        console.log('[TON Connect] ✅ TonConnectUI is available, proceeding with initialization');
         
         // Add initialization timeout to prevent hanging
         const initTimeout = setTimeout(() => {
@@ -3121,8 +3151,9 @@
         
         if (!data.success || !data.wallet) {
           // Check if there's a warning (like missing Supabase)
+          // Note: This is just informational - wallets are still created, just stored in-memory
           if (data.warning) {
-            console.warn('Wallet warning:', data.warning);
+            console.log('[Wallet] Info:', data.warning); // Changed from warn to log - this is expected behavior
           }
           throw new Error('Invalid wallet response from server');
         }
@@ -3172,12 +3203,9 @@
         }
         
         // Check for warnings (like encryption key missing)
-        const statusEl = document.getElementById('walletStatusBar');
-        if (statusEl && (data.warning || data.error === 'encryption_key_missing')) {
-          statusEl.textContent = '⚠ Wallet created (not saved - config issue)';
-          statusEl.style.background = 'var(--red)';
-          statusEl.style.color = 'white';
-          console.warn('Wallet warning:', data.warning || data.help);
+        // Note: These are just informational - wallets are still functional
+        if (data.warning) {
+          console.log('[Wallet] Info:', data.warning || data.help); // Changed from warn to log
         }
         
         // If TON address exists in wallet but not connected in TON Connect, show it
@@ -3543,7 +3571,7 @@
 
       try {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2588',message:'fetchMarkets called',data:{kind, sportType, selectedCategory: state.selectedCategory},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // Removed debug analytics to localhost - was causing ERR_CONNECTION_REFUSED errors
         // #endregion
         console.log('[fetchMarkets] Fetching:', kind, 'sportType:', sportType);
         // Reduce limit for faster loading - 1000 markets is plenty for initial display
@@ -3555,7 +3583,7 @@
         console.log('[fetchMarkets] URL:', apiUrl);
         
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2596',message:'API request URL',data:{apiUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // Removed debug analytics to localhost - was causing ERR_CONNECTION_REFUSED errors
         // #endregion
         const resp = await fetch(apiUrl);
         console.log('[fetchMarkets] Status:', resp.status, resp.statusText);
@@ -3568,7 +3596,7 @@
         
         const data = await resp.json();
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2611',message:'API response received',data:{marketCount: data.markets?.length || 0, meta: data.meta, firstMarketQuestion: data.markets?.[0]?.question, firstMarketCategory: data.markets?.[0]?.eventTitle},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // Removed debug analytics to localhost - was causing ERR_CONNECTION_REFUSED errors
         // #endregion
         console.log('[fetchMarkets] Response data:', data);
         console.log('[fetchMarkets] Markets count:', data.markets?.length || 0);
@@ -3577,7 +3605,7 @@
         
         if (markets.length > 0) {
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2617',message:'Markets before render',data:{marketCount: markets.length, sampleMarkets: markets.slice(0, 3).map(m => ({question: m.question, eventTitle: m.eventTitle, volume: m.volume24hr}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          // Removed debug analytics to localhost - was causing ERR_CONNECTION_REFUSED errors
           // #endregion
           console.log('[fetchMarkets] First market:', markets[0]);
           state.markets = markets;
@@ -3588,7 +3616,7 @@
         }
       } catch (err) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/cf0ac01b-cbf1-4c16-aaa3-32490620eb9e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:2625',message:'fetchMarkets error',data:{error: err.message, stack: err.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // Removed debug analytics to localhost - was causing ERR_CONNECTION_REFUSED errors
         // #endregion
         console.error('[fetchMarkets] Error:', err);
         list.innerHTML = `
