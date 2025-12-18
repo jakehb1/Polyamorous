@@ -2181,7 +2181,8 @@
         }
         
         // For Telegram Mini Apps, TON Connect should use Telegram Wallet natively
-        // Configure to use TON Foundation's bridge service (not localhost)
+        // When in Telegram, TON Connect UI automatically detects and uses Telegram Wallet
+        // No bridgeUrl is needed - Telegram provides its own native bridge
         const tonConnectConfig = {
           manifestUrl: manifestUrl,
           buttonRootId: 'tonConnectButtonContainer',
@@ -2192,15 +2193,25 @@
           }
         };
         
-        // Only set bridgeUrl if not in Telegram (Telegram has its own bridge)
+        // Only set bridgeUrl if NOT in Telegram (Telegram has its own native bridge)
+        // When bridgeUrl is omitted in Telegram, TON Connect UI automatically uses Telegram Wallet
         if (!isTelegram) {
           tonConnectConfig.bridgeUrl = 'https://connect.ton.org/bridge';
+          console.log('[TON Connect] Using TON Foundation bridge (non-Telegram environment)');
+        } else {
+          console.log('[TON Connect] Telegram environment detected - will use native Telegram Wallet');
         }
         
         tonConnectUI = new TonConnectUI(tonConnectConfig);
         clearTimeout(initTimeout);
         
-        console.log('[TON Connect] Initialized', isTelegram ? 'for Telegram' : 'with TON Foundation bridge');
+        if (isTelegram) {
+          console.log('[TON Connect] ✅ Initialized for Telegram Mini App');
+          console.log('[TON Connect] ✅ Will use native Telegram Wallet (no bridgeUrl needed)');
+          console.log('[TON Connect] When user connects, Telegram Wallet will open natively');
+        } else {
+          console.log('[TON Connect] Initialized with TON Foundation bridge (non-Telegram environment)');
+        }
         
         // Check if initialization was successful
         if (!tonConnectUI) {
@@ -2317,12 +2328,19 @@
               const walletAppName = walletInfo.device?.appName || walletInfo.provider || 'Unknown';
               const network = walletInfo.account?.chain || 'mainnet'; // Default to mainnet if not specified
               
-              console.log('[TON Connect] Wallet connected:', {
+              console.log('[TON Connect] ✅ Wallet connected:', {
                 address: tonAddress,
                 appName: walletAppName,
                 network: network,
-                device: walletInfo.device
+                device: walletInfo.device,
+                provider: walletInfo.provider,
+                isNativeTelegram: walletAppName.toLowerCase().includes('telegram') || walletInfo.provider === 'telegram'
               });
+              
+              // Log if using native Telegram Wallet
+              if (isTelegram && (walletAppName.toLowerCase().includes('telegram') || walletInfo.provider === 'telegram')) {
+                console.log('[TON Connect] ✅ Confirmed: Using native Telegram Wallet');
+              }
               
               // Phase 1.4: Network detection and blocking
               // Check if app is in mainnet mode and wallet is testnet
